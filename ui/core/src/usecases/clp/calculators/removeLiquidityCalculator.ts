@@ -1,5 +1,3 @@
-import { Ref } from "@vue/reactivity";
-
 import {
   Amount,
   Asset,
@@ -12,23 +10,23 @@ import { format } from "../../../utils/format";
 import { PoolState } from "./addLiquidityCalculator";
 
 export function useRemoveLiquidityCalculator(input: {
-  externalAssetSymbol: Ref<string | null>;
-  nativeAssetSymbol: Ref<string | null>;
-  wBasisPoints: Ref<string | null>;
-  asymmetry: Ref<string | null>;
-  poolFinder: (a: Asset | string, b: Asset | string) => Ref<Pool> | null;
-  liquidityProvider: Ref<LiquidityProvider | null>;
-  sifAddress: Ref<string>;
+  externalAssetSymbol: string | null;
+  nativeAssetSymbol: string | null;
+  wBasisPoints: string | null;
+  asymmetry: string | null;
+  poolFinder: (a: Asset | string, b: Asset | string) => Pool | null;
+  liquidityProvider: LiquidityProvider | null;
+  sifAddress: string;
 }) {
   // this function needs to be refactored so
   const externalAsset = (() => {
-    if (!input.externalAssetSymbol.value) return null;
-    return Asset(input.externalAssetSymbol.value);
+    if (!input.externalAssetSymbol) return null;
+    return Asset(input.externalAssetSymbol);
   })();
 
   const nativeAsset = (() => {
-    if (!input.nativeAssetSymbol.value) return null;
-    return Asset(input.nativeAssetSymbol.value);
+    if (!input.nativeAssetSymbol) return null;
+    return Asset(input.nativeAssetSymbol);
   })();
 
   const liquidityPool = (() => {
@@ -36,7 +34,7 @@ export function useRemoveLiquidityCalculator(input: {
 
     // Find pool from poolFinder
     const pool = input.poolFinder(externalAsset, nativeAsset);
-    return pool?.value ?? null;
+    return pool ?? null;
   })();
 
   const poolUnits = (() => {
@@ -45,21 +43,20 @@ export function useRemoveLiquidityCalculator(input: {
   })();
 
   const wBasisPoints = (() => {
-    if (!input.wBasisPoints.value) return null;
-    return Amount(input.wBasisPoints.value);
+    if (!input.wBasisPoints) return null;
+    return Amount(input.wBasisPoints);
   })();
 
   const asymmetry = (() => {
-    if (!input.asymmetry.value) return null;
-    return Amount(input.asymmetry.value);
+    if (!input.asymmetry) return null;
+    return Amount(input.asymmetry);
   })();
 
   const nativeAssetBalance = (() => {
     if (!liquidityPool) return null;
     return (
-      liquidityPool.amounts.find(
-        (a) => a.symbol === input.nativeAssetSymbol.value,
-      ) ?? null
+      liquidityPool.amounts.find((a) => a.symbol === input.nativeAssetSymbol) ??
+      null
     );
   })();
 

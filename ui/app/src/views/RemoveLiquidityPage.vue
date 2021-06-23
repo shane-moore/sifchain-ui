@@ -45,7 +45,7 @@ export default defineComponent({
     );
     const { connected } = useWalletButton();
 
-    const liquidityProvider = ref(null) as Ref<LiquidityProvider | null>;
+    let liquidityProvider = null as LiquidityProvider | null;
     const withdrawExternalAssetAmount: Ref<string | null> = ref(null);
     const withdrawNativeAssetAmount: Ref<string | null> = ref(null);
     const address = computed(() => store.wallet.sif.address);
@@ -59,7 +59,7 @@ export default defineComponent({
           lpAddress: store.wallet.sif.address,
         })
         .then((liquidityProviderResult) => {
-          liquidityProvider.value = liquidityProviderResult;
+          liquidityProvider = liquidityProviderResult;
         });
     });
 
@@ -69,13 +69,16 @@ export default defineComponent({
 
     // if these values change, recalculate state and asset amounts
     watch([wBasisPoints, asymmetry, liquidityProvider], () => {
+      if (!liquidityProvider) {
+        return null;
+      }
       const calcData = useRemoveLiquidityCalculator({
         externalAssetSymbol,
         nativeAssetSymbol,
         wBasisPoints,
         asymmetry,
         liquidityProvider,
-        sifAddress: toRef(store.wallet.sif, "address"),
+        sifAddress: store.wallet.sif,
         poolFinder,
       });
       state.value = calcData.state;
