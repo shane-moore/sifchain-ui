@@ -49,7 +49,7 @@ module.exports = {
           base: "#459FEE",
         },
         connected: {
-          base: "#39C357",
+          base: "#5AF37C",
         },
         danger: {
           base: "#FF4F4F",
