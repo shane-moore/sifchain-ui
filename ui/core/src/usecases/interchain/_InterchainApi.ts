@@ -1,15 +1,10 @@
 import {
   IAssetAmount,
   TransactionStatus,
-  IAsset,
   Chain,
   IAmount,
 } from "../../entities";
 import { UsecaseContext } from "..";
-import { SifchainChain } from "../../services/ChainsService";
-import { EventEmitter } from "events";
-import TypedEmitter, { Arguments } from "typed-emitter";
-import { UnpegEvent } from "../peg/unpeg";
 import { PegEvent } from "../peg/peg";
 import { IterableEmitter } from "../../utils/IterableEmitter";
 
@@ -61,20 +56,20 @@ export class ExecutableTransaction extends IterableEmitter<
     private fn: (
       executableTx: ExecutableTransaction,
     ) => Promise<ChainTransferTransaction | undefined>,
+    public fee?: IAssetAmount,
   ) {
     super();
   }
 
   async execute(): Promise<ChainTransferTransaction | undefined> {
-    this.isComplete = false;
     const tx = await this.fn(this);
-    this.isComplete = true;
+    this.stopStreamingEvents();
     this.emitter.removeAllListeners();
     return tx;
   }
 
   async *generator(): AsyncGenerator<PegEvent> {
-    for await (const ev of this._generator()) {
+    for await (const ev of this.startStreamingEvents()) {
       yield {
         type: ev.type,
         tx: ev.payload,

@@ -54,12 +54,12 @@ export const importStore = Vuextra.createStore({
       self.setPegEvent(undefined);
 
       const interchain = useCore().usecases.interchain(
-        useChains().getByNetwork(payload.assetAmount.network),
+        useChains().getByNetwork(ctx.state.draft.network),
         useChains().sifchain,
       );
       const executableTx = await interchain.prepareTransfer(
         payload.assetAmount,
-        accountStore.state.ethereum.address,
+        accountStore.state[ctx.state.draft.network].address,
         accountStore.state.sifchain.address,
       );
 
@@ -68,17 +68,7 @@ export const importStore = Vuextra.createStore({
         console.log("setPegEvent", ev);
         self.setPegEvent(ev);
       }
-
-      const chainTransferTx = await promise;
-      if (chainTransferTx) {
-        self.setPegEvent({
-          type: "sent",
-          tx: {
-            state: "requested",
-            hash: chainTransferTx.hash,
-          },
-        });
-      }
+      await promise;
     },
   }),
 

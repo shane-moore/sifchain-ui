@@ -54,23 +54,21 @@ export class IterableEmitter<Type, Payload> {
       Type,
       Payload
     >;
-    this.emit = this.emitter.emit.bind(this.emitter);
     this.on = this.emitter.on.bind(this.emitter);
 
-    const _emit = this.emit;
     this.emit = (event: Type, payload: Payload) => {
       console.log(event, payload);
       this.processEvent(event, payload);
-      return _emit.call(this, event, payload);
+      return this.emitter.emit(event, payload);
     };
     this.promiseResolver = createPromiseResolver();
   }
 
-  setGeneratorCompleted() {
-    this.isComplete = true;
-  }
-
-  async *_generator(): AsyncGenerator<{ type: Type; payload: Payload }> {
+  async *startStreamingEvents(): AsyncGenerator<{
+    type: Type;
+    payload: Payload;
+  }> {
+    this.isComplete = false;
     while (!this.isComplete) {
       if (this.eventQueue.length) {
         const event = this.eventQueue.shift();
@@ -86,5 +84,10 @@ export class IterableEmitter<Type, Payload> {
         }
       }
     }
+  }
+
+  stopStreamingEvents() {
+    this.isComplete = false;
+    this.promiseResolver?.resolve();
   }
 }

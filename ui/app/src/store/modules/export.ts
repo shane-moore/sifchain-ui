@@ -1,8 +1,10 @@
+import { useChains } from "@/hooks/useChains";
 import { useCore } from "@/hooks/useCore";
 import { IAsset, IAssetAmount, Network } from "@sifchain/sdk";
 import { PegEvent } from "../../../../core/src/usecases/peg/peg";
 import { UnpegEvent } from "../../../../core/src/usecases/peg/unpeg";
 import { Vuextra } from "../Vuextra";
+import { accountStore } from "./accounts";
 
 export type ExportDraft = {
   amount: string;
@@ -45,13 +47,23 @@ export const exportStore = Vuextra.createStore({
     async runExport(payload: { assetAmount: IAssetAmount }) {
       if (!payload.assetAmount) throw new Error("Please provide an amount");
       self.setUnpegEvent(undefined);
-      for await (const event of useCore().usecases.peg.unpeg(
+
+      const interchain = useCore().usecases.interchain(
+        useChains().sifchain,
+        useChains().getByNetwork(ctx.state.draft.network),
+      );
+      const executableTx = await interchain.prepareTransfer(
         payload.assetAmount,
-        ctx.state.draft.network,
-      )) {
-        self.setUnpegEvent(event);
-        console.log({ event });
+        accountStore.state.sifchain.address,
+        accountStore.state[ctx.state.draft.network].address,
+      );
+
+      const promise = executableTx.execute();
+      for await (const ev of executableTx.generator()) {
+        console.log("setUnpegEvent", ev);
+        self.setUnpegEvent(ev);
       }
+      await promise;
     },
   }),
 
