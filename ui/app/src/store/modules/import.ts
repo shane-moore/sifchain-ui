@@ -58,12 +58,14 @@ export const importStore = Vuextra.createStore({
         accountStore.state.sifchain.address,
       );
 
-      const promise = executableTx.execute();
+      executableTx.execute();
+
       for await (const ev of executableTx.generator()) {
         console.log("setPegEvent", ev);
         self.setPegEvent(ev);
       }
-      await promise;
+
+      await executableTx.awaitResult();
     },
   }),
 

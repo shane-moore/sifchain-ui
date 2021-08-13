@@ -50,8 +50,14 @@ export class InterchainApi {
 
 export class ExecutableTransaction extends IterableEmitter<
   PegEvent["type"],
-  TransactionStatus | undefined
+  TransactionStatus | undefined,
+  ChainTransferTransaction
 > {
+  private iterator?: AsyncGenerator<{
+    type: PegEvent["type"];
+    payload: TransactionStatus | undefined;
+  }>;
+
   constructor(
     private fn: (
       executableTx: ExecutableTransaction,
@@ -61,15 +67,27 @@ export class ExecutableTransaction extends IterableEmitter<
     super();
   }
 
-  async execute(): Promise<ChainTransferTransaction | undefined> {
-    const tx = await this.fn(this);
-    this.stopStreamingEvents();
-    this.emitter.removeAllListeners();
-    return tx;
+  execute() {
+    super.execute();
+    // Execute is sync, non-promise-returning, so do async in a closure.
+    (async () => {
+      try {
+        const tx = await this.fn(this);
+        this.completeExecution(tx);
+      } catch (error) {
+        console.error(error);
+        this.emit("tx_error", {
+          state: "failed",
+          hash: "",
+          memo: error.message,
+        });
+        this.completeExecution();
+      }
+    })();
   }
 
   async *generator(): AsyncGenerator<PegEvent> {
-    for await (const ev of this.startStreamingEvents()) {
+    for await (const ev of this._generator()) {
       yield {
         type: ev.type,
         tx: ev.payload,

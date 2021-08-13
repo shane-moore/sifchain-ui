@@ -7,7 +7,7 @@ import {
 } from "./_InterchainApi";
 import { SifchainChain, CosmoshubChain } from "../../services/ChainsService";
 import { isBroadcastTxFailure } from "@cosmjs/stargate";
-import { findAttribute, parseRawLog } from "@cosmjs/stargate/build/logs";
+import { findAttribute, parseRawLog, Log } from "@cosmjs/stargate/build/logs";
 
 export default function createCosmoshubSifchainApi(
   context: UsecaseContext,
@@ -150,4 +150,10 @@ class CosmoshubSifchainInterchainApi
   ): Promise<TransactionStatus> {
     throw "not implemented";
   }
+}
+
+class CosmosTransferTransaction extends ChainTransferTransaction {
+  meta?: {
+    logs?: Log[];
+  };
 }

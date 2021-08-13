@@ -1,5 +1,5 @@
 import { Asset, AssetAmount, IAsset } from "../../../entities";
-import { isOriginallySifchainNativeToken } from "./isOriginallyNetworkNativeToken";
+import { isOriginallySifchainNativeToken } from "./isOriginallySifchainNativeToken";
 
 export function calculateUnpegFee(asset: IAsset) {
   const feeNumber = isOriginallySifchainNativeToken(asset)

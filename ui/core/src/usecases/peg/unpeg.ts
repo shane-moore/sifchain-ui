@@ -4,7 +4,7 @@ import { IAssetAmount, Network, TransactionStatus } from "../../entities";
 import { Services } from "../../services";
 import { Store } from "../../store";
 import { calculateUnpegFee } from "./utils/calculateExportFee";
-import { isOriginallySifchainNativeToken } from "./utils/isOriginallyNetworkNativeToken";
+import { isOriginallySifchainNativeToken } from "./utils/isOriginallySifchainNativeToken";
 
 type UnpegServices = {
   ethbridge: Pick<Services["ethbridge"], "lockToEthereum" | "burnToEthereum">;

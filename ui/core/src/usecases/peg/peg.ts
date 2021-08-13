@@ -11,7 +11,7 @@ import { IAssetAmount, Network, TransactionStatus } from "../../entities";
 import { Services } from "../../services";
 import { Store } from "../../store";
 import { isSupportedEVMChain } from "../utils";
-import { isOriginallySifchainNativeToken } from "./utils/isOriginallyNetworkNativeToken";
+import { isOriginallySifchainNativeToken } from "./utils/isOriginallySifchainNativeToken";
 import { SubscribeToTx as SubscribeToTxDep } from "./utils/subscribeToTx";
 
 type PegServices = {

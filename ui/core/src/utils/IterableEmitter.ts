@@ -22,72 +22,101 @@ interface TypedEmitterInterface<Type, Payload> {
   setMaxListeners(maxListeners: number): this;
 }
 
-const createPromiseResolver = () => {
-  let resolve: (x?: any) => void;
-  let promise: Promise<unknown> | null = new Promise((r) => (resolve = r));
+type PromiseResolver<T> = {
+  promise: Promise<T>;
+  resolve: (t?: T) => void;
+};
+function createPromiseResolver<T>(): PromiseResolver<T> {
+  let resolve: (value: T | PromiseLike<T>) => void;
+  let promise: Promise<T> | null = new Promise((r) => (resolve = r));
 
   return {
     promise,
     // @ts-ignore
     resolve,
   };
-};
+}
 
-export class IterableEmitter<Type, Payload> {
-  emitter: TypedEmitterInterface<Type, Payload>;
-  isComplete = false;
+type IterableEmitterEvent<T, P> = { type: T; payload: P };
 
-  emit: TypedEmitterInterface<Type, Payload>["emit"];
-  on: TypedEmitterInterface<Type, Payload>["on"];
+export class IterableEmitter<EventTypes, EventPayload, FinalResult> {
+  emitter: TypedEmitterInterface<EventTypes, EventPayload>;
+  private isActivated = false;
+  private isComplete = false;
 
-  private promiseResolver: ReturnType<typeof createPromiseResolver> | null;
-  private eventQueue: { type: Type; payload: Payload }[] = [];
+  emit: TypedEmitterInterface<EventTypes, EventPayload>["emit"];
+  on: TypedEmitterInterface<EventTypes, EventPayload>["on"];
 
-  private processEvent(event: Type, payload: Payload) {
+  private resultPromiseResolver = createPromiseResolver<FinalResult>();
+
+  private iteratorPromiseResolver?: PromiseResolver<undefined> | null;
+  private eventQueue: IterableEmitterEvent<EventTypes, EventPayload>[] = [];
+
+  private processEvent(event: EventTypes, payload: EventPayload) {
     this.eventQueue.push({ type: event, payload });
-    this.promiseResolver?.resolve();
-    this.promiseResolver = null;
+    this.iteratorPromiseResolver?.resolve();
   }
 
   constructor() {
     this.emitter = (new EventEmitter() as unknown) as TypedEmitterInterface<
-      Type,
-      Payload
+      EventTypes,
+      EventPayload
     >;
     this.on = this.emitter.on.bind(this.emitter);
 
-    this.emit = (event: Type, payload: Payload) => {
-      console.log(event, payload);
+    this.emit = (event: EventTypes, payload: EventPayload) => {
+      if (this.isComplete) {
+        throw new Error(
+          `Cannot emit event ${event} after IterableEmitter is complete!`,
+        );
+      }
+
       this.processEvent(event, payload);
       return this.emitter.emit(event, payload);
     };
-    this.promiseResolver = createPromiseResolver();
+    this.iteratorPromiseResolver = createPromiseResolver();
   }
 
-  async *startStreamingEvents(): AsyncGenerator<{
-    type: Type;
-    payload: Payload;
-  }> {
-    this.isComplete = false;
+  hasActivated() {
+    return this.isActivated;
+  }
+
+  awaitResult() {
+    return this.resultPromiseResolver.promise;
+  }
+
+  execute() {
+    if (this.hasActivated()) {
+      throw new Error("Cannot start an IterableEmitter twice!");
+    }
+    this.isActivated = true;
+  }
+
+  async *_generator(): AsyncGenerator<
+    IterableEmitterEvent<EventTypes, EventPayload>
+  > {
+    if (!this.hasActivated())
+      throw new Error("Cannot call generator before activation");
+    if (this.isComplete)
+      throw new Error("Cannot call generator after  completion");
     while (!this.isComplete) {
-      if (this.eventQueue.length) {
+      while (this.eventQueue.length) {
         const event = this.eventQueue.shift();
         if (event) yield event;
+      }
+      if (this.isComplete) {
+        break;
       } else {
-        if (this.isComplete) {
-          break;
-        } else {
-          if (!this.promiseResolver) {
-            this.promiseResolver = createPromiseResolver();
-          }
-          await this.promiseResolver.promise;
-        }
+        this.iteratorPromiseResolver = createPromiseResolver();
+        await this.iteratorPromiseResolver.promise;
       }
     }
   }
 
-  stopStreamingEvents() {
-    this.isComplete = false;
-    this.promiseResolver?.resolve();
+  completeExecution(finalResult?: FinalResult) {
+    this.isComplete = true;
+    this.iteratorPromiseResolver?.resolve();
+    this.emitter.removeAllListeners();
+    this.resultPromiseResolver.resolve(finalResult);
   }
 }
