@@ -5,6 +5,7 @@ import {
   ExecutableTransaction,
   InterchainTransaction,
   InterchainParams,
+  CosmosInterchainTransaction,
 } from "./_InterchainApi";
 import { SifchainChain, CosmoshubChain } from "../../services/ChainsService";
 import { isBroadcastTxFailure } from "@cosmjs/stargate";
@@ -23,7 +24,8 @@ export default function createCosmoshubSifchainApi(
   );
 }
 
-export class CosmoshubSifchainInterchainApi implements InterchainApi {
+export class CosmoshubSifchainInterchainApi
+  implements InterchainApi<CosmosInterchainTransaction> {
   constructor(
     public context: UsecaseContext,
     public fromChain: CosmoshubChain,
@@ -33,52 +35,54 @@ export class CosmoshubSifchainInterchainApi implements InterchainApi {
   async estimateFees(params: InterchainParams) {} // no fees
 
   transfer(params: InterchainParams) {
-    return new ExecutableTransaction(async (emit) => {
-      emit("signing");
-      try {
-        const txSequence = await this.context.services.ibc.transferIBCTokens({
-          sourceNetwork: params.assetAmount.asset.network,
-          destinationNetwork: Network.SIFCHAIN,
-          assetAmountToTransfer: params.assetAmount,
-        });
-        for (let tx of txSequence) {
-          if (isBroadcastTxFailure(tx)) {
-            this.context.services.bus.dispatch({
-              type: "ErrorEvent",
-              payload: {
-                message: "IBC Transfer Failed",
-              },
-            });
-            emit("tx_error", {
-              state: tx.rawLog?.includes("out of gas")
-                ? "out_of_gas"
-                : "failed",
-              memo: tx.rawLog || "",
-              hash: tx.transactionHash,
-            });
-            return;
-          } else {
-            const logs = parseRawLog(tx.rawLog);
-            return {
-              ...params,
-              fromChainId: this.fromChain.id,
-              toChainId: this.toChain.id,
-              hash: tx.transactionHash,
-              meta: { logs },
-            } as CosmosTransaction;
+    return new ExecutableTransaction<CosmosInterchainTransaction>(
+      async (emit) => {
+        emit("signing");
+        try {
+          const txSequence = await this.context.services.ibc.transferIBCTokens({
+            sourceNetwork: params.assetAmount.asset.network,
+            destinationNetwork: Network.SIFCHAIN,
+            assetAmountToTransfer: params.assetAmount,
+          });
+          for (let tx of txSequence) {
+            if (isBroadcastTxFailure(tx)) {
+              this.context.services.bus.dispatch({
+                type: "ErrorEvent",
+                payload: {
+                  message: "IBC Transfer Failed",
+                },
+              });
+              emit("tx_error", {
+                state: tx.rawLog?.includes("out of gas")
+                  ? "out_of_gas"
+                  : "failed",
+                memo: tx.rawLog || "",
+                hash: tx.transactionHash,
+              });
+              return;
+            } else {
+              const logs = parseRawLog(tx.rawLog);
+              return {
+                ...params,
+                fromChainId: this.fromChain.id,
+                toChainId: this.toChain.id,
+                hash: tx.transactionHash,
+                meta: { logs },
+              } as CosmosInterchainTransaction;
+            }
           }
+        } catch (err) {
+          // "signing_error"?
+          console.error(err);
+          emit("approve_error");
+          return;
         }
-      } catch (err) {
-        // "signing_error"?
-        console.error(err);
-        emit("approve_error");
-        return;
-      }
-    });
+      },
+    );
   }
 
   async *subscribeToTransfer(
-    tx: CosmosTransaction,
+    tx: CosmosInterchainTransaction,
   ): AsyncGenerator<TransactionStatus> {
     const logs = tx.meta?.logs;
     if (!logs) return;
@@ -138,9 +142,3 @@ export class CosmoshubSifchainInterchainApi implements InterchainApi {
     }
   }
 }
-
-type CosmosTransaction = InterchainTransaction & {
-  meta?: {
-    logs?: Log[];
-  };
-};

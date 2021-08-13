@@ -8,6 +8,7 @@ import { UsecaseContext } from "..";
 import { PegEvent } from "../peg/peg";
 import { IterableEmitter } from "../../utils/IterableEmitter";
 import { defer } from "../../utils/defer";
+import { Log } from "@cosmjs/stargate/build/logs";
 
 export type InterchainParams = {
   assetAmount: IAssetAmount;
@@ -21,7 +22,13 @@ export type InterchainTransaction = InterchainParams & {
   hash: string;
 };
 
-export interface InterchainApi {
+export type CosmosInterchainTransaction = InterchainTransaction & {
+  meta?: {
+    logs?: Log[];
+  };
+};
+
+export interface InterchainApi<TxType> {
   fromChain: Chain;
   toChain: Chain;
   context: UsecaseContext;
@@ -30,23 +37,21 @@ export interface InterchainApi {
     params: InterchainParams,
   ): Promise<IAssetAmount | undefined | void>;
 
-  transfer(params: InterchainParams): ExecutableTransaction;
+  transfer(params: InterchainParams): ExecutableTransaction<TxType>;
 
-  subscribeToTransfer(
-    transferTx: InterchainTransaction,
-  ): AsyncGenerator<TransactionStatus>;
+  subscribeToTransfer(transferTx: TxType): AsyncGenerator<TransactionStatus>;
 }
 
-export class ExecutableTransaction extends IterableEmitter<
+export class ExecutableTransaction<TxType> extends IterableEmitter<
   PegEvent["type"],
   TransactionStatus | undefined
 > {
-  private deferred = defer<InterchainTransaction | undefined>();
+  private deferred = defer<TxType | undefined>();
 
   constructor(
     private fn: (
-      emit: ExecutableTransaction["emit"],
-    ) => Promise<InterchainTransaction | undefined>,
+      emit: ExecutableTransaction<TxType>["emit"],
+    ) => Promise<TxType | undefined>,
   ) {
     super();
     this.execute();

@@ -11,6 +11,8 @@ import { SifchainChain, EthereumChain } from "../../services/ChainsService";
 import { isSupportedEVMChain } from "../utils";
 import { isOriginallySifchainNativeToken } from "../peg/utils/isOriginallySifchainNativeToken";
 import { createIteratorSubject } from "../../utils/iteratorSubject";
+import { InterchainTransaction } from "./_InterchainApi";
+import { InterchainTransaction } from "./_InterchainApi";
 
 const ETH_CONFIRMATIONS = 50;
 
@@ -26,7 +28,8 @@ export default function createEthereumSifchainApi(
   );
 }
 
-export class EthereumSifchainInterchainApi implements InterchainApi {
+export class EthereumSifchainInterchainApi
+  implements InterchainApi<InterchainTransaction> {
   subscribeToTx: ReturnType<typeof SubscribeToTx>;
 
   constructor(
@@ -40,7 +43,7 @@ export class EthereumSifchainInterchainApi implements InterchainApi {
   async estimateFees(params: InterchainParams) {} // no fees
 
   transfer(params: InterchainParams) {
-    return new ExecutableTransaction(async (emit) => {
+    return new ExecutableTransaction<InterchainTransaction>(async (emit) => {
       if (!isSupportedEVMChain(this.context.store.wallet.eth.chainId)) {
         this.context.services.bus.dispatch({
           type: "ErrorEvent",
@@ -102,7 +105,7 @@ export class EthereumSifchainInterchainApi implements InterchainApi {
           fromChainId: this.fromChain.id,
           toChainId: this.toChain.id,
           hash: hash,
-        };
+        } as InterchainTransaction;
       } catch (transactionStatus) {
         emit("tx_error", transactionStatus);
       }

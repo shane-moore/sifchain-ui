@@ -5,6 +5,7 @@ import {
   ExecutableTransaction,
   InterchainTransaction,
   InterchainParams,
+  CosmosInterchainTransaction,
 } from "./_InterchainApi";
 import { parseTxFailure } from "../../services/SifService/parseTxFailure";
 import { SubscribeToTx } from "../peg/utils/subscribeToTx";
@@ -24,7 +25,8 @@ export default function createSifchainEthereumApi(
   );
 }
 
-export class SifchainEthereumInterchainApi implements InterchainApi {
+export class SifchainEthereumInterchainApi
+  implements InterchainApi<InterchainTransaction> {
   subscribeToTx: ReturnType<typeof SubscribeToTx>;
 
   constructor(
@@ -40,7 +42,7 @@ export class SifchainEthereumInterchainApi implements InterchainApi {
   }
 
   transfer(params: InterchainParams) {
-    return new ExecutableTransaction(async (emit) => {
+    return new ExecutableTransaction<InterchainTransaction>(async (emit) => {
       const feeAmount = await this.estimateFees(params);
       emit("signing");
 
@@ -93,7 +95,7 @@ export class SifchainEthereumInterchainApi implements InterchainApi {
         hash: txStatus.hash,
         fromChainId: this.fromChain.id,
         toChainId: this.toChain.id,
-      };
+      } as InterchainTransaction;
     });
   }
 
