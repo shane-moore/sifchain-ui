@@ -60,13 +60,12 @@ export class ChainsService {
   getAll() {
     return this._list;
   }
-
-  getByNetwork(network: Network) {
+  getByNetwork(network: Network): AnyChain {
     switch (network) {
-      case Network.COSMOSHUB:
-        return this.cosmoshub;
       case Network.SIFCHAIN:
         return this.sifchain;
+      case Network.COSMOSHUB:
+        return this.cosmoshub;
       case Network.ETHEREUM:
         return this.ethereum;
     }

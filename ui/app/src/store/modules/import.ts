@@ -1,11 +1,6 @@
 import { useChainsList, useChains } from "@/hooks/useChains";
 import { useCore } from "@/hooks/useCore";
-import {
-  IAsset,
-  IAssetAmount,
-  Network,
-  TransactionStatus,
-} from "@sifchain/sdk";
+import { IAsset, IAssetAmount, Network } from "@sifchain/sdk";
 import { PegEvent } from "../../../../core/src/usecases/peg/peg";
 import { Vuextra } from "../Vuextra";
 import { accountStore } from "./accounts";

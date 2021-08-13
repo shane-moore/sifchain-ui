@@ -10,8 +10,6 @@ import { SubscribeToTx } from "../peg/utils/subscribeToTx";
 import { SifchainChain, EthereumChain } from "../../services/ChainsService";
 import { calculateUnpegFee } from "../peg/utils/calculateExportFee";
 
-const ETH_CONFIRMATIONS = 50;
-
 export default function createSifchainEthereumApi(
   context: UsecaseContext,
   sifchainChain: SifchainChain,

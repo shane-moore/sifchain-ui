@@ -5,12 +5,14 @@ import EthereumSifchain from "./ethereumSifchain";
 import CosmoshubSifchain from "./cosmoshubSifchain";
 import SifchainEthereum from "./sifchainEthereum";
 import SifchainCosmoshub from "./sifchainEthereum";
+
 import {
   EthereumChain,
   SifchainChain,
   CosmoshubChain,
 } from "../../services/ChainsService/chains";
 import { InterchainApi } from "./_InterchainApi";
+// import ethereumToSifchain from "./ethereumToSifchain";
 // import sifchainToethereum from "./sifchainToethereum";
 // import sifchainToEthereum from "./sifchainToEthereum";
 
