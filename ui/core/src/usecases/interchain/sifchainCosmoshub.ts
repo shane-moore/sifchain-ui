@@ -16,16 +16,22 @@ export default function createCosmoshubSifchainApi(
   cosmoshubChain: CosmoshubChain,
   sifchainChain: SifchainChain,
 ) {
-  return new CosmoshubSifchainInterchainApi(
+  return new SifchainCosmoshubInterchainApi(
     context,
     cosmoshubChain,
     sifchainChain,
   );
 }
 
-class CosmoshubSifchainInterchainApi
-  extends InterchainApi
-  implements InterchainApi {
+export class SifchainCosmoshubInterchainApi implements InterchainApi {
+  constructor(
+    public context: UsecaseContext,
+    public fromChain: CosmoshubChain,
+    public toChain: SifchainChain,
+  ) {}
+
+  async estimateFees(params: InterchainParams) {} // no fees
+
   transfer(params: InterchainParams) {
     return new ExecutableTransaction(async (emit) => {
       emit("signing");
@@ -55,16 +61,20 @@ class CosmoshubSifchainInterchainApi
             hash: tx.transactionHash,
             memo: "Transaction Completed",
           });
-          return new InterchainTransaction(
-            this.fromChain.id,
-            this.toChain.id,
-            params.fromAddress,
-            params.toAddress,
-            tx.transactionHash,
-            params.assetAmount,
-          );
+          return {
+            ...params,
+            hash: tx.transactionHash,
+            fromChainId: this.fromChain.id,
+            toChainId: this.toChain.id,
+          };
         }
       }
     });
+  }
+
+  async *subscribeToTransfer(
+    tx: InterchainTransaction,
+  ): AsyncGenerator<TransactionStatus> {
+    throw "not implemented";
   }
 }

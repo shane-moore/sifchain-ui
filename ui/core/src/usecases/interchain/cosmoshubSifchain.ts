@@ -9,6 +9,7 @@ import {
 import { SifchainChain, CosmoshubChain } from "../../services/ChainsService";
 import { isBroadcastTxFailure } from "@cosmjs/stargate";
 import { findAttribute, parseRawLog, Log } from "@cosmjs/stargate/build/logs";
+import { createIteratorSubject } from "../../utils/iteratorSubject";
 
 export default function createCosmoshubSifchainApi(
   context: UsecaseContext,
@@ -22,9 +23,15 @@ export default function createCosmoshubSifchainApi(
   );
 }
 
-class CosmoshubSifchainInterchainApi
-  extends InterchainApi
-  implements InterchainApi {
+export class CosmoshubSifchainInterchainApi implements InterchainApi {
+  constructor(
+    public context: UsecaseContext,
+    public fromChain: CosmoshubChain,
+    public toChain: SifchainChain,
+  ) {}
+
+  async estimateFees(params: InterchainParams) {} // no fees
+
   transfer(params: InterchainParams) {
     return new ExecutableTransaction(async (emit) => {
       emit("signing");
@@ -52,83 +59,13 @@ class CosmoshubSifchainInterchainApi
             return;
           } else {
             const logs = parseRawLog(tx.rawLog);
-
-            // debugger;
-            this.context.services.bus.dispatch({
-              type: "PegTransactionPendingEvent",
-              payload: {
-                hash: tx.transactionHash,
-              },
-            });
-            emit("sent", {
-              state: "requested",
+            return {
+              ...params,
+              fromChainId: this.fromChain.id,
+              toChainId: this.toChain.id,
               hash: tx.transactionHash,
-            });
-            const sequence = findAttribute(
-              logs,
-              "send_packet",
-              "packet_sequence",
-            );
-            const dstChannel = findAttribute(
-              logs,
-              "send_packet",
-              "packet_dst_channel",
-            );
-            const dstPort = findAttribute(
-              logs,
-              "send_packet",
-              "packet_dst_port",
-            );
-            const timeoutTimestampNanoseconds = findAttribute(
-              logs,
-              "send_packet",
-              "packet_timeout_timestamp",
-            );
-            const timeoutTimestampMs =
-              BigInt(timeoutTimestampNanoseconds.value as string) /
-              BigInt(1000000);
-
-            while (true) {
-              await new Promise((r) => setTimeout(r, 1000));
-              if (+timeoutTimestampMs.toString() < Date.now()) {
-                this.context.services.bus.dispatch({
-                  type: "PegTransactionErrorEvent",
-                  payload: {
-                    message: "Timed out waiting for packet receipt.",
-                    txStatus: {
-                      state: "failed",
-                      hash: tx.transactionHash,
-                    },
-                  },
-                });
-                break;
-              }
-              try {
-                const received = await this.context.services.ibc.checkIfPacketReceived(
-                  Network.SIFCHAIN,
-                  dstChannel.value,
-                  dstPort.value,
-                  sequence.value,
-                );
-                if (received) {
-                  this.context.services.bus.dispatch({
-                    type: "PegTransactionCompletedEvent",
-                    payload: {
-                      hash: tx.transactionHash,
-                    },
-                  });
-                  return;
-                }
-              } catch (e) {}
-            }
-            return new InterchainTransaction(
-              this.fromChain.id,
-              this.toChain.id,
-              params.fromAddress,
-              params.toAddress,
-              tx.transactionHash,
-              params.assetAmount,
-            );
+              meta: { logs },
+            } as CosmosTransaction;
           }
         }
       } catch (err) {
@@ -139,10 +76,71 @@ class CosmoshubSifchainInterchainApi
       }
     });
   }
+
+  async *subscribeToTransfer(
+    tx: CosmosTransaction,
+  ): AsyncGenerator<TransactionStatus> {
+    const logs = tx.meta?.logs;
+    if (!logs) return;
+
+    const sequence = findAttribute(logs, "send_packet", "packet_sequence");
+    const dstChannel = findAttribute(logs, "send_packet", "packet_dst_channel");
+    const dstPort = findAttribute(logs, "send_packet", "packet_dst_port");
+    const timeoutTimestampNanoseconds = findAttribute(
+      logs,
+      "send_packet",
+      "packet_timeout_timestamp",
+    );
+    const timeoutTimestampMs =
+      BigInt(timeoutTimestampNanoseconds.value as string) / BigInt(1000000);
+
+    while (true) {
+      await new Promise((r) => setTimeout(r, 1000));
+      if (+timeoutTimestampMs.toString() < Date.now()) {
+        this.context.services.bus.dispatch({
+          type: "PegTransactionErrorEvent",
+          payload: {
+            message: "Timed out waiting for packet receipt.",
+            txStatus: {
+              state: "failed",
+              hash: tx.hash,
+            },
+          },
+        });
+        yield {
+          state: "failed",
+          hash: tx.hash,
+          memo: "Timed out waiting for packet receipt",
+        };
+        break;
+      }
+      try {
+        const received = await this.context.services.ibc.checkIfPacketReceived(
+          Network.SIFCHAIN,
+          dstChannel.value,
+          dstPort.value,
+          sequence.value,
+        );
+        if (received) {
+          this.context.services.bus.dispatch({
+            type: "PegTransactionCompletedEvent",
+            payload: {
+              hash: tx.hash,
+            },
+          });
+          yield {
+            state: "completed",
+            hash: tx.hash,
+          };
+          return;
+        }
+      } catch (e) {}
+    }
+  }
 }
 
-class CosmosTransferTransaction extends InterchainTransaction {
+type CosmosTransaction = InterchainTransaction & {
   meta?: {
     logs?: Log[];
   };
-}
+};

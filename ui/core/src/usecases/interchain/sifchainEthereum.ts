@@ -17,21 +17,22 @@ export default function createSifchainEthereumApi(
   sifchainChain: SifchainChain,
   ethereumChain: EthereumChain,
 ) {
-  return new EthereumSifchainInterchainApi(
+  return new SifchainEthereumInterchainApi(
     context,
     sifchainChain,
     ethereumChain,
   );
 }
 
-class EthereumSifchainInterchainApi
-  extends InterchainApi
-  implements InterchainApi {
+export class SifchainEthereumInterchainApi implements InterchainApi {
   subscribeToTx: ReturnType<typeof SubscribeToTx>;
 
-  constructor(context: UsecaseContext, fromChain: Chain, toChain: Chain) {
-    super(context, fromChain, toChain);
-    this.subscribeToTx = SubscribeToTx(this.context);
+  constructor(
+    public context: UsecaseContext,
+    public fromChain: Chain,
+    public toChain: Chain,
+  ) {
+    this.subscribeToTx = SubscribeToTx(context);
   }
 
   async estimateFees(params: InterchainParams) {
@@ -87,14 +88,18 @@ class EthereumSifchainInterchainApi
         tx.value.msg,
       );
 
-      return new InterchainTransaction(
-        this.fromChain.id,
-        this.toChain.id,
-        params.fromAddress,
-        params.toAddress,
-        txStatus.hash,
-        params.assetAmount,
-      );
+      return {
+        ...params,
+        hash: txStatus.hash,
+        fromChainId: this.fromChain.id,
+        toChainId: this.toChain.id,
+      };
     });
+  }
+
+  async *subscribeToTransfer(
+    tx: InterchainTransaction,
+  ): AsyncGenerator<TransactionStatus> {
+    throw "not implemented";
   }
 }

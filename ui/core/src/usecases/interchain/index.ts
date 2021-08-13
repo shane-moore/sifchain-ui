@@ -11,10 +11,6 @@ import {
   SifchainChain,
   CosmoshubChain,
 } from "../../services/ChainsService/chains";
-import { InterchainApi } from "./_InterchainApi";
-// import ethereumToSifchain from "./ethereumToSifchain";
-// import sifchainToethereum from "./sifchainToethereum";
-// import sifchainToEthereum from "./sifchainToEthereum";
 
 export default function InterchainUsecase(context: UsecaseContext) {
   const chains = context.services.chains;
@@ -38,7 +34,7 @@ export default function InterchainUsecase(context: UsecaseContext) {
     chains.cosmoshub,
     chains.sifchain,
   );
-  return (from: Chain, to: Chain): InterchainApi => {
+  return (from: Chain, to: Chain) => {
     if (from instanceof EthereumChain && to instanceof SifchainChain) {
       return ethereumSifchain;
     } else if (from instanceof CosmoshubChain && to instanceof SifchainChain) {

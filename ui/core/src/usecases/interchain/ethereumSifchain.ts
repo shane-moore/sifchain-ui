@@ -26,9 +26,7 @@ export default function createEthereumSifchainApi(
   );
 }
 
-class EthereumSifchainInterchainApi
-  extends InterchainApi
-  implements InterchainApi {
+export class EthereumSifchainInterchainApi implements InterchainApi {
   subscribeToTx: ReturnType<typeof SubscribeToTx>;
 
   constructor(
@@ -36,9 +34,10 @@ class EthereumSifchainInterchainApi
     public fromChain: Chain,
     public toChain: Chain,
   ) {
-    super(context, fromChain, toChain);
     this.subscribeToTx = SubscribeToTx(context);
   }
+
+  async estimateFees(params: InterchainParams) {} // no fees
 
   transfer(params: InterchainParams) {
     return new ExecutableTransaction(async (emit) => {
@@ -98,14 +97,12 @@ class EthereumSifchainInterchainApi
 
         emit("sent", { state: "completed", hash });
 
-        return new InterchainTransaction(
-          this.fromChain.id,
-          this.toChain.id,
-          params.fromAddress,
-          params.toAddress,
-          hash,
-          params.assetAmount,
-        );
+        return {
+          ...params,
+          fromChainId: this.fromChain.id,
+          toChainId: this.toChain.id,
+          hash: hash,
+        };
       } catch (transactionStatus) {
         emit("tx_error", transactionStatus);
       }

@@ -9,71 +9,32 @@ import { PegEvent } from "../peg/peg";
 import { IterableEmitter } from "../../utils/IterableEmitter";
 import { defer } from "../../utils/defer";
 
-export class InterchainTransaction {
-  constructor(
-    public fromChainId: string,
-    public toChainId: string,
-    public fromAddress: string,
-    public toAddress: string,
-    public hash: string,
-    public assetAmount: IAssetAmount,
-  ) {}
-
-  toJSON() {
-    return {
-      fromChainId: this.fromChainId,
-      toChainId: this.toChainId,
-      fromAddress: this.fromAddress,
-      toAddress: this.toAddress,
-      hash: this.hash,
-      symbol: this.assetAmount.symbol,
-      amount: this.assetAmount.amount.toBigInt().toString(),
-    };
-  }
-  static fromJSON(json: any) {
-    return new InterchainTransaction(
-      json.fromChainId as string,
-      json.toChainId as string,
-      json.fromAddress as string,
-      json.toAddress as string,
-      json.hash as string,
-      AssetAmount(json.symbol as string, json.amount as string),
-    );
-  }
-}
-
 export type InterchainParams = {
   assetAmount: IAssetAmount;
   fromAddress: string;
   toAddress: string;
 };
 
-export class InterchainApi {
+export type InterchainTransaction = InterchainParams & {
+  fromChainId: string;
+  toChainId: string;
+  hash: string;
+};
+
+export interface InterchainApi {
   fromChain: Chain;
   toChain: Chain;
   context: UsecaseContext;
 
-  constructor(context: UsecaseContext, fromChain: Chain, toChain: Chain) {
-    this.context = context;
-    this.fromChain = fromChain;
-    this.toChain = toChain;
-  }
-
-  async estimateFees(
+  estimateFees(
     params: InterchainParams,
-  ): Promise<IAssetAmount | undefined> {
-    return undefined;
-  }
+  ): Promise<IAssetAmount | undefined | void>;
 
-  transfer(params: InterchainParams): ExecutableTransaction {
-    throw "not implemented";
-  }
+  transfer(params: InterchainParams): ExecutableTransaction;
 
-  // async *subscribeToTransfer(
-  //   transferTx: ChainTransferTransaction,
-  // ): AsyncGenerator<TransactionStatus> {
-  //   throw "not implemented";
-  // }
+  subscribeToTransfer(
+    transferTx: InterchainTransaction,
+  ): AsyncGenerator<TransactionStatus>;
 }
 
 export class ExecutableTransaction extends IterableEmitter<
