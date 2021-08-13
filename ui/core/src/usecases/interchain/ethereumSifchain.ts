@@ -28,9 +28,13 @@ class EthereumSifchainInterchainApi
   implements InterchainApi {
   subscribeToTx: ReturnType<typeof SubscribeToTx>;
 
-  constructor(context: UsecaseContext, fromChain: Chain, toChain: Chain) {
+  constructor(
+    public context: UsecaseContext,
+    public fromChain: Chain,
+    public toChain: Chain,
+  ) {
     super(context, fromChain, toChain);
-    this.subscribeToTx = SubscribeToTx(this.context);
+    this.subscribeToTx = SubscribeToTx(context);
   }
 
   async prepareTransfer(
@@ -87,21 +91,29 @@ class EthereumSifchainInterchainApi
         const pegTx = lockOrBurnFn(toAddress, assetAmount, ETH_CONFIRMATIONS);
         this.subscribeToTx(pegTx);
 
-        const hash = await new Promise<string>((resolve) => {
-          pegTx.onTxHash((hash) => {
-            resolve(hash.txHash);
+        try {
+          const hash = await new Promise<string>((resolve, reject) => {
+            pegTx.onError((error) => {
+              reject(error.payload);
+            });
+            pegTx.onTxHash((hash) => {
+              resolve(hash.txHash);
+            });
           });
-        });
-        executableTx.emit("sent", { state: "completed", hash });
 
-        return new ChainTransferTransaction(
-          this.fromChain.id,
-          this.toChain.id,
-          fromAddress,
-          toAddress,
-          hash,
-          assetAmount,
-        );
+          executableTx.emit("sent", { state: "completed", hash });
+
+          return new ChainTransferTransaction(
+            this.fromChain.id,
+            this.toChain.id,
+            fromAddress,
+            toAddress,
+            hash,
+            assetAmount,
+          );
+        } catch (transactionStatus) {
+          executableTx.emit("tx_error", transactionStatus);
+        }
       },
     );
   }
