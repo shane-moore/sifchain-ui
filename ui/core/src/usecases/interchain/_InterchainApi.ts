@@ -2,25 +2,51 @@ import {
   IAssetAmount,
   TransactionStatus,
   Chain,
-  IAmount,
+  AssetAmount,
 } from "../../entities";
 import { UsecaseContext } from "..";
 import { PegEvent } from "../peg/peg";
 import { IterableEmitter } from "../../utils/IterableEmitter";
+import { defer } from "../../utils/defer";
 
-export class ChainTransferTransaction {
+export class InterchainTransaction {
   constructor(
     public fromChainId: string,
     public toChainId: string,
     public fromAddress: string,
     public toAddress: string,
     public hash: string,
-    public assetAmount: IAmount,
+    public assetAmount: IAssetAmount,
   ) {}
 
-  toJSON() {}
-  fromJSON() {}
+  toJSON() {
+    return {
+      fromChainId: this.fromChainId,
+      toChainId: this.toChainId,
+      fromAddress: this.fromAddress,
+      toAddress: this.toAddress,
+      hash: this.hash,
+      symbol: this.assetAmount.symbol,
+      amount: this.assetAmount.amount.toBigInt().toString(),
+    };
+  }
+  static fromJSON(json: any) {
+    return new InterchainTransaction(
+      json.fromChainId as string,
+      json.toChainId as string,
+      json.fromAddress as string,
+      json.toAddress as string,
+      json.hash as string,
+      AssetAmount(json.symbol as string, json.amount as string),
+    );
+  }
 }
+
+export type InterchainParams = {
+  assetAmount: IAssetAmount;
+  fromAddress: string;
+  toAddress: string;
+};
 
 export class InterchainApi {
   fromChain: Chain;
@@ -33,48 +59,49 @@ export class InterchainApi {
     this.toChain = toChain;
   }
 
-  async prepareTransfer(
-    assetAmount: IAssetAmount,
-    fromAddress: string,
-    toAddress: string,
-  ): Promise<ExecutableTransaction> {
+  async estimateFees(
+    params: InterchainParams,
+  ): Promise<IAssetAmount | undefined> {
+    return undefined;
+  }
+
+  transfer(params: InterchainParams): ExecutableTransaction {
     throw "not implemented";
   }
 
-  async subscribeToTransfer(
-    transferTx: ChainTransferTransaction,
-  ): Promise<TransactionStatus> {
-    throw "not implemented";
-  }
+  // async *subscribeToTransfer(
+  //   transferTx: ChainTransferTransaction,
+  // ): AsyncGenerator<TransactionStatus> {
+  //   throw "not implemented";
+  // }
 }
 
 export class ExecutableTransaction extends IterableEmitter<
   PegEvent["type"],
-  TransactionStatus | undefined,
-  ChainTransferTransaction
+  TransactionStatus | undefined
 > {
-  private iterator?: AsyncGenerator<{
-    type: PegEvent["type"];
-    payload: TransactionStatus | undefined;
-  }>;
+  private deferred = defer<InterchainTransaction | undefined>();
 
   constructor(
     private fn: (
-      executableTx: ExecutableTransaction,
-    ) => Promise<ChainTransferTransaction | undefined>,
-    public fee?: IAssetAmount,
+      emit: ExecutableTransaction["emit"],
+    ) => Promise<InterchainTransaction | undefined>,
   ) {
     super();
+    this.execute();
   }
 
-  execute() {
-    super.execute();
-    // Execute is sync, non-promise-returning, so do async in a closure.
-    (async () => {
-      try {
-        const tx = await this.fn(this);
-        this.completeExecution(tx);
-      } catch (error) {
+  awaitResult() {
+    return this.deferred.promise;
+  }
+
+  private execute() {
+    this.fn(this.emit)
+      .then((tx) => {
+        this.completeExecution();
+        this.deferred.resolve(tx);
+      })
+      .catch((error) => {
         console.error(error);
         this.emit("tx_error", {
           state: "failed",
@@ -82,12 +109,12 @@ export class ExecutableTransaction extends IterableEmitter<
           memo: error.message,
         });
         this.completeExecution();
-      }
-    })();
+        this.deferred.resolve();
+      });
   }
 
   async *generator(): AsyncGenerator<PegEvent> {
-    for await (const ev of this._generator()) {
+    for await (const ev of this.subject.iterator) {
       yield {
         type: ev.type,
         tx: ev.payload,
@@ -95,72 +122,3 @@ export class ExecutableTransaction extends IterableEmitter<
     }
   }
 }
-
-// export interface TransactionStatusEvents {
-//   requested: (tx: TransactionStatus) => void;
-//   accepted: (tx: TransactionStatus) => void;
-//   failed: (tx: TransactionStatus) => void;
-//   rejected: (tx: TransactionStatus) => void;
-//   out_of_gas: (tx: TransactionStatus) => void;
-//   completed: (tx: TransactionStatus) => void;
-// }
-// const transactionStatusEvents: Array<keyof TransactionStatusEvents> = [
-//   "requested",
-//   "accepted",
-//   "failed",
-//   "rejected",
-//   "out_of_gas",
-//   "completed",
-// ];
-// export class InflightTransaction extends (EventEmitter as new () => TypedEmitter<TransactionStatusEvents>) {
-//   isComplete = false;
-
-//   constructor(private transactionStatus: TransactionStatus) {
-//     super();
-
-//     const complete = () => {
-//       this.isComplete = true;
-//       this.removeAllListeners();
-//     };
-//     this.on("failed", complete);
-//     this.on("rejected", complete);
-//     this.on("out_of_gas", complete);
-//     this.on("completed", complete);
-//   }
-
-//   update(state: TransactionStatus["state"], data?: Partial<TransactionStatus>) {
-//     Object.assign(this.transactionStatus, { ...data, state });
-//     this.emit(state, this.transactionStatus);
-//   }
-
-//   current() {
-//     return this.transactionStatus;
-//   }
-
-//   async *generator(): AsyncGenerator<keyof TransactionStatusEvents> {
-//     let events: Array<keyof TransactionStatusEvents> = [];
-//     let resolve: (v?: any) => void;
-//     let promise = new Promise((r) => (resolve = r));
-
-//     transactionStatusEvents.forEach((name) =>
-//       this.on(name, () => {
-//         events.push(name);
-//         resolve();
-//       }),
-//     );
-
-//     while (true) {
-//       if (events.length) {
-//         const name = events.shift();
-//         if (name) yield name;
-//       } else {
-//         if (this.isComplete) {
-//           break;
-//         } else {
-//           if (!promise) promise = new Promise((r) => (resolve = r));
-//           await promise;
-//         }
-//       }
-//     }
-//   }
-// }

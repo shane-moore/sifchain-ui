@@ -3,12 +3,14 @@ import { IAssetAmount, Chain, TransactionStatus } from "../../entities";
 import {
   InterchainApi,
   ExecutableTransaction,
-  ChainTransferTransaction,
+  InterchainTransaction,
+  InterchainParams,
 } from "./_InterchainApi";
 import { SubscribeToTx } from "../peg/utils/subscribeToTx";
 import { SifchainChain, EthereumChain } from "../../services/ChainsService";
 import { isSupportedEVMChain } from "../utils";
 import { isOriginallySifchainNativeToken } from "../peg/utils/isOriginallySifchainNativeToken";
+import { createIteratorSubject } from "../../utils/iteratorSubject";
 
 const ETH_CONFIRMATIONS = 50;
 
@@ -38,118 +40,89 @@ class EthereumSifchainInterchainApi
     this.subscribeToTx = SubscribeToTx(context);
   }
 
-  async prepareTransfer(
-    assetAmount: IAssetAmount,
-    fromAddress: string,
-    toAddress: string,
-  ) {
-    return new ExecutableTransaction(
-      async (executableTx: ExecutableTransaction) => {
-        if (!isSupportedEVMChain(this.context.store.wallet.eth.chainId)) {
-          this.context.services.bus.dispatch({
-            type: "ErrorEvent",
-            payload: {
-              message: "EVM Network not supported!",
-            },
-          });
-          executableTx.emit("tx_error", {
-            state: "failed",
-            hash: "",
-            memo: "EVM network not supported",
-          });
+  transfer(params: InterchainParams) {
+    return new ExecutableTransaction(async (emit) => {
+      if (!isSupportedEVMChain(this.context.store.wallet.eth.chainId)) {
+        this.context.services.bus.dispatch({
+          type: "ErrorEvent",
+          payload: {
+            message: "EVM Network not supported!",
+          },
+        });
+        emit("tx_error", {
+          state: "failed",
+          hash: "",
+          memo: "EVM network not supported",
+        });
+        return;
+      }
+
+      if (params.assetAmount.asset.symbol !== "eth") {
+        emit("approve_started");
+        try {
+          await this.context.services.ethbridge.approveBridgeBankSpend(
+            params.fromAddress,
+            params.assetAmount,
+          );
+        } catch (error) {
+          emit("approve_error");
           return;
         }
-        // Get approval
-        if (assetAmount.asset.symbol !== "eth") {
-          executableTx.emit("approve_started");
-          try {
-            await this.context.services.ethbridge.approveBridgeBankSpend(
-              fromAddress,
-              assetAmount,
-            );
-          } catch (error) {
-            executableTx.emit("approve_error");
-            return;
-          }
-          executableTx.emit("approved");
-        }
+        emit("approved");
+      }
 
-        executableTx.emit("signing");
+      emit("signing");
 
-        const lockOrBurnFn = isOriginallySifchainNativeToken(assetAmount.asset)
-          ? this.context.services.ethbridge.burnToSifchain
-          : this.context.services.ethbridge.lockToSifchain;
+      const lockOrBurnFn = isOriginallySifchainNativeToken(
+        params.assetAmount.asset,
+      )
+        ? this.context.services.ethbridge.burnToSifchain
+        : this.context.services.ethbridge.lockToSifchain;
 
-        const pegTx = lockOrBurnFn(toAddress, assetAmount, ETH_CONFIRMATIONS);
-        this.subscribeToTx(pegTx);
+      const pegTx = lockOrBurnFn(
+        params.toAddress,
+        params.assetAmount,
+        ETH_CONFIRMATIONS,
+      );
+      this.subscribeToTx(pegTx);
 
-        try {
-          const hash = await new Promise<string>((resolve, reject) => {
-            pegTx.onError((error) => {
-              reject(error.payload);
-            });
-            pegTx.onTxHash((hash) => {
-              resolve(hash.txHash);
-            });
+      try {
+        const hash = await new Promise<string>((resolve, reject) => {
+          pegTx.onError((error) => {
+            reject(error.payload);
           });
+          pegTx.onTxHash((hash) => {
+            resolve(hash.txHash);
+          });
+        });
 
-          executableTx.emit("sent", { state: "completed", hash });
+        emit("sent", { state: "completed", hash });
 
-          return new ChainTransferTransaction(
-            this.fromChain.id,
-            this.toChain.id,
-            fromAddress,
-            toAddress,
-            hash,
-            assetAmount,
-          );
-        } catch (transactionStatus) {
-          executableTx.emit("tx_error", transactionStatus);
-        }
-      },
-    );
+        return new InterchainTransaction(
+          this.fromChain.id,
+          this.toChain.id,
+          params.fromAddress,
+          params.toAddress,
+          hash,
+          params.assetAmount,
+        );
+      } catch (transactionStatus) {
+        emit("tx_error", transactionStatus);
+      }
+    });
   }
 
-  async subscribeToTransfer(
-    transferTx: ChainTransferTransaction,
-  ): Promise<TransactionStatus> {
-    throw "not implemented";
-    // const status: TransactionStatus = {
-    //   state: "accepted",
-    //   hash: transferTx.hash,
-    // };
-    // if (
-    //   transferTx.fromChainId !== this.fromChain.id ||
-    //   transferTx.toChainId !== this.toChain.id
-    // ) {
-    //   throw new Error("Cannot subscribe!");
-    // }
-
-    // const inflightTx = new InflightTransaction(status);
-
-    // const run = async () => {
-    //   const pegTx = this.context.services.ethbridge.createPegTx(
-    //     ETH_CONFIRMATIONS,
-    //     transferTx.fromSymbol,
-    //     transferTx.hash,
-    //   );
-    //   const unsubscribe = this.subscribeToTx(pegTx);
-
-    //   try {
-    //     await new Promise((resolve, reject) => {
-    //       pegTx.onComplete(resolve);
-    //       pegTx.onError(reject);
-    //     });
-    //   } catch (error) {
-    //     inflightTx.update("failed", { memo: error.message });
-    //     return;
-    //   } finally {
-    //     unsubscribe();
-    //   }
-    //   inflightTx.update("completed");
-    // };
-
-    // run();
-    // return inflightTx;
+  async *subscribeToTransfer(transferTx: InterchainTransaction) {
+    const pegTx = this.context.services.ethbridge.createPegTx(
+      ETH_CONFIRMATIONS,
+      transferTx.assetAmount.asset.symbol,
+      transferTx.hash,
+    );
+    const { iterator, feed, end } = createIteratorSubject<TransactionStatus>();
+    this.subscribeToTx(pegTx, (tx: TransactionStatus) => {
+      feed(tx);
+      if (tx.state === "completed" || tx.state === "failed") end();
+    });
+    return iterator;
   }
 }

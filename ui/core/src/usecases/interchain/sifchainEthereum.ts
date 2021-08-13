@@ -3,7 +3,8 @@ import { IAssetAmount, Chain, TransactionStatus } from "../../entities";
 import {
   InterchainApi,
   ExecutableTransaction,
-  ChainTransferTransaction,
+  InterchainTransaction,
+  InterchainParams,
 } from "./_InterchainApi";
 import { parseTxFailure } from "../../services/SifService/parseTxFailure";
 import { SubscribeToTx } from "../peg/utils/subscribeToTx";
@@ -33,24 +34,25 @@ class EthereumSifchainInterchainApi
     this.subscribeToTx = SubscribeToTx(this.context);
   }
 
-  async prepareTransfer(
-    assetAmount: IAssetAmount,
-    fromAddress: string,
-    toAddress: string,
-  ) {
-    const feeAmount = calculateUnpegFee(assetAmount.asset);
+  async estimateFees(params: InterchainParams) {
+    return calculateUnpegFee(params.assetAmount.asset);
+  }
 
-    const execute = async (executableTx: ExecutableTransaction) => {
-      executableTx.emit("signing");
+  transfer(params: InterchainParams) {
+    return new ExecutableTransaction(async (emit) => {
+      const feeAmount = await this.estimateFees(params);
+      emit("signing");
 
-      const lockOrBurnFn = isOriginallySifchainNativeToken(assetAmount.asset)
+      const lockOrBurnFn = isOriginallySifchainNativeToken(
+        params.assetAmount.asset,
+      )
         ? this.context.services.ethbridge.lockToEthereum
         : this.context.services.ethbridge.burnToEthereum;
 
       const tx = await lockOrBurnFn({
-        assetAmount,
-        ethereumRecipient: toAddress,
-        fromAddress: fromAddress,
+        assetAmount: params.assetAmount,
+        ethereumRecipient: params.toAddress,
+        fromAddress: params.fromAddress,
         feeAmount,
       });
 
@@ -66,7 +68,7 @@ class EthereumSifchainInterchainApi
             message: txStatus.memo || "There was an error while unpegging",
           },
         });
-        executableTx.emit(
+        emit(
           "tx_error",
           parseTxFailure({
             transactionHash: txStatus.hash,
@@ -74,7 +76,7 @@ class EthereumSifchainInterchainApi
           }),
         );
       } else {
-        executableTx.emit("sent", txStatus);
+        emit("sent", txStatus);
       }
 
       console.log(
@@ -85,58 +87,14 @@ class EthereumSifchainInterchainApi
         tx.value.msg,
       );
 
-      return new ChainTransferTransaction(
+      return new InterchainTransaction(
         this.fromChain.id,
         this.toChain.id,
-        fromAddress,
-        toAddress,
+        params.fromAddress,
+        params.toAddress,
         txStatus.hash,
-        assetAmount,
+        params.assetAmount,
       );
-    };
-    return new ExecutableTransaction(execute, feeAmount);
-  }
-
-  async subscribeToTransfer(
-    transferTx: ChainTransferTransaction,
-  ): Promise<TransactionStatus> {
-    throw "not implemented";
-    // const status: TransactionStatus = {
-    //   state: "accepted",
-    //   hash: transferTx.hash,
-    // };
-    // if (
-    //   transferTx.fromChainId !== this.fromChain.id ||
-    //   transferTx.toChainId !== this.toChain.id
-    // ) {
-    //   throw new Error("Cannot subscribe!");
-    // }
-
-    // const inflightTx = new InflightTransaction(status);
-
-    // const run = async () => {
-    //   const pegTx = this.context.services.ethbridge.createPegTx(
-    //     ETH_CONFIRMATIONS,
-    //     transferTx.fromSymbol,
-    //     transferTx.hash,
-    //   );
-    //   const unsubscribe = this.subscribeToTx(pegTx);
-
-    //   try {
-    //     await new Promise((resolve, reject) => {
-    //       pegTx.onComplete(resolve);
-    //       pegTx.onError(reject);
-    //     });
-    //   } catch (error) {
-    //     inflightTx.update("failed", { memo: error.message });
-    //     return;
-    //   } finally {
-    //     unsubscribe();
-    //   }
-    //   inflightTx.update("completed");
-    // };
-
-    // run();
-    // return inflightTx;
+    });
   }
 }

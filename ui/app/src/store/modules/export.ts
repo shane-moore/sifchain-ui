@@ -52,18 +52,18 @@ export const exportStore = Vuextra.createStore({
         useChains().sifchain,
         useChains().getByNetwork(ctx.state.draft.network),
       );
-      const executableTx = await interchain.prepareTransfer(
-        payload.assetAmount,
-        accountStore.state.sifchain.address,
-        accountStore.state[ctx.state.draft.network].address,
-      );
+      const executable = interchain.transfer({
+        assetAmount: payload.assetAmount,
+        fromAddress: accountStore.state.sifchain.address,
+        toAddress: accountStore.state[ctx.state.draft.network].address,
+      });
 
-      const promise = executableTx.execute();
-      for await (const ev of executableTx.generator()) {
+      for await (const ev of executable.generator()) {
         console.log("setUnpegEvent", ev);
         self.setUnpegEvent(ev);
       }
-      await promise;
+
+      const chainTx = await executable.awaitResult();
     },
   }),
 
