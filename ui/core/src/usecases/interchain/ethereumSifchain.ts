@@ -8,6 +8,7 @@ import {
 import { SubscribeToTx } from "../peg/utils/subscribeToTx";
 import { SifchainChain, EthereumChain } from "../../services/ChainsService";
 import { isSupportedEVMChain } from "../utils";
+import { isOriginallySifchainNativeToken } from "../peg/utils/isOriginallySifchainNativeToken";
 
 const ETH_CONFIRMATIONS = 50;
 
@@ -75,16 +76,7 @@ class EthereumSifchainInterchainApi
 
         executableTx.emit("signing");
 
-        const isNativeAsset = this.context.services.chains
-          .getAll()
-          .some((chain: Chain) => {
-            return (
-              chain.findAssetWithLikeSymbol(assetAmount.asset.symbol)
-                ?.symbol === chain.nativeAsset.symbol
-            );
-          });
-
-        const lockOrBurnFn = isNativeAsset
+        const lockOrBurnFn = isOriginallySifchainNativeToken(assetAmount.asset)
           ? this.context.services.ethbridge.burnToSifchain
           : this.context.services.ethbridge.lockToSifchain;
 

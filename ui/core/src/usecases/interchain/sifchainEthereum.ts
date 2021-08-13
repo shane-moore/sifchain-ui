@@ -9,6 +9,7 @@ import { parseTxFailure } from "../../services/SifService/parseTxFailure";
 import { SubscribeToTx } from "../peg/utils/subscribeToTx";
 import { SifchainChain, EthereumChain } from "../../services/ChainsService";
 import { calculateUnpegFee } from "../peg/utils/calculateExportFee";
+import { isOriginallySifchainNativeToken } from "../peg/utils/isOriginallySifchainNativeToken";
 
 export default function createSifchainEthereumApi(
   context: UsecaseContext,
@@ -42,15 +43,7 @@ class EthereumSifchainInterchainApi
     const execute = async (executableTx: ExecutableTransaction) => {
       executableTx.emit("signing");
 
-      const isNativeAsset = this.context.services.chains
-        .getAll()
-        .some((chain: Chain) => {
-          return (
-            chain.findAssetWithLikeSymbol(assetAmount.asset.symbol)?.symbol ===
-            chain.nativeAsset.symbol
-          );
-        });
-      const lockOrBurnFn = isNativeAsset
+      const lockOrBurnFn = isOriginallySifchainNativeToken(assetAmount.asset)
         ? this.context.services.ethbridge.lockToEthereum
         : this.context.services.ethbridge.burnToEthereum;
 

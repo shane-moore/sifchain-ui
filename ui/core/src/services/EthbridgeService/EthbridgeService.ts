@@ -366,7 +366,7 @@ export default function createEthbridgeService({
           bridgebankContractAddress,
         );
         const accounts = await web3.eth.getAccounts();
-        const coinDenom = assetAmount.asset.address || ETH_ADDRESS;
+        const coinDenom = assetAmount.asset.address;
         const amount = assetAmount.toBigInt().toString();
         const fromAddress = account || accounts[0];
 
@@ -375,7 +375,6 @@ export default function createEthbridgeService({
           value: 0,
           gas: 150000, // Note: This chose in lieu of burn(params).estimateGas({from})
         };
-        console.log({ sendArgs, coinDenom });
 
         bridgeBankContract.methods
           .burn(cosmosRecipient, coinDenom, amount)
