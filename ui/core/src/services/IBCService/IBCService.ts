@@ -244,6 +244,7 @@ export class IBCService {
 
     await keplr?.enable(sourceChain.chainId);
     const sendingSigner = await loadOfflineSigner(sourceChain.chainId);
+    debugger;
     if (!sendingSigner) throw new Error("No sending signer");
 
     console.log(
