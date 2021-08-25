@@ -49,6 +49,7 @@ function parseEventToNotifications(event: AppEvent): INotification | null {
         message: `Import Pending: ${title}`,
         loader: true,
         onAction: action,
+        manualClose: true,
       };
     } else if (event.type === "PegTransactionErrorEvent") {
       return {
@@ -58,12 +59,14 @@ function parseEventToNotifications(event: AppEvent): INotification | null {
           .filter((i) => i !== "")
           .join(": "),
         onAction: action,
+        manualClose: true,
       };
     } else if (event.type === "PegTransactionCompletedEvent") {
       return {
         id: event.payload.interchainTx.hash,
         type: "success",
         message: `Import Complete! ${title}`,
+        manualClose: true,
       };
     }
   }
@@ -94,6 +97,7 @@ function parseEventToNotifications(event: AppEvent): INotification | null {
         message: `Export Pending: ${title}`,
         loader: true,
         onAction: action,
+        manualClose: true,
       };
     } else if (event.type === "UnpegTransactionErrorEvent") {
       return {
@@ -103,12 +107,14 @@ function parseEventToNotifications(event: AppEvent): INotification | null {
           .filter((i) => i !== "")
           .join(": "),
         onAction: action,
+        manualClose: true,
       };
     } else if (event.type === "UnpegTransactionCompletedEvent") {
       return {
         id: event.payload.interchainTx.hash,
         type: "success",
         message: `Export Complete! ${title}`,
+        manualClose: true,
       };
     }
   }

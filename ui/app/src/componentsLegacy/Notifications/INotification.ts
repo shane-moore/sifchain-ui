@@ -4,5 +4,6 @@ export type INotification = {
   type: "error" | "success" | "info";
   message: string;
   loader?: boolean;
+  manualClose?: boolean;
   onAction?: () => void;
 };
