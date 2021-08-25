@@ -5,5 +5,6 @@ export type INotification = {
   message: string;
   loader?: boolean;
   manualClose?: boolean;
+  key?: string;
   onAction?: () => void;
 };

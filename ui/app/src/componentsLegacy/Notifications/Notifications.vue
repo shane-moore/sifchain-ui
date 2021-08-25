@@ -7,6 +7,8 @@ import { INotification } from "./INotification";
 import { NotificationElement } from "./NotificationElement";
 import { formatAssetAmount } from "@/componentsLegacy/shared/utils";
 
+let nextNotificationKey = 0;
+
 // Visual Notifications are a view level system here we work out which ones are displayed to the user
 function parseEventToNotifications(event: AppEvent): INotification | null {
   if (event.type === "NoLiquidityPoolsFoundEvent") {
@@ -177,7 +179,10 @@ export default defineComponent({
             notifications.splice(notifications.indexOf(item), 1);
         });
       }
-      if (notification !== null) notifications.unshift(notification);
+      if (notification !== null) {
+        notification.key = String(nextNotificationKey++);
+        notifications.unshift(notification);
+      }
     });
 
     return {
@@ -195,7 +200,7 @@ export default defineComponent({
     <transition-group name="list">
       <NotificationElement
         v-for="(item, index) in notifications"
-        v-bind:key="item.id + item.message + index"
+        v-bind:key="item.key"
         :index="index"
         :onRemove="removeItem"
         :notification="item"

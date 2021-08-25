@@ -73,15 +73,22 @@ export const NotificationElement = defineComponent({
         />
         {props.notification.message}
         {!!props.notification.manualClose && (
-          <button
-            onClick={(ev) => {
-              removeRef.value();
-              ev.stopPropagation();
-            }}
-            class="text-white p-[2px] ml-[8px] hover:bg-gray-action_button cursor-pointer rounded-sm"
-          >
-            <AssetIcon icon="interactive/close" class="opacity-50" size={20} />
-          </button>
+          <>
+            <div class="flex-1" />
+            <button
+              onClick={(ev) => {
+                removeRef.value();
+                ev.stopPropagation();
+              }}
+              class="text-white p-[2px] ml-[8px] hover:bg-gray-action_button cursor-pointer rounded-sm"
+            >
+              <AssetIcon
+                icon="interactive/close"
+                class="opacity-50"
+                size={20}
+              />
+            </button>
+          </>
         )}
       </div>
     );
