@@ -1,5 +1,5 @@
 import * as TokenRegistryV1Query from "../../../generated/proto/sifnode/tokenregistry/v1/query";
-import * as TokenRegistryV1Tx from "../../../generated/proto/sifnode/tokenregistry/v1/query";
+import * as TokenRegistryV1Tx from "../../../generated/proto/sifnode/tokenregistry/v1/tx";
 import * as CLPV1Query from "../../../generated/proto/sifnode/clp/v1/querier";
 import * as CLPV1Tx from "../../../generated/proto/sifnode/clp/v1/tx";
 import * as DispensationV1Query from "../../../generated/proto/sifnode/dispensation/v1/query";
@@ -30,6 +30,7 @@ import {
 import { BroadcastTxCommitResponse } from "@cosmjs/tendermint-rpc/build/tendermint34";
 import { SimulationResponse } from "@cosmjs/stargate/build/codec/cosmos/base/abci/v1beta1/abci";
 import { sleep } from "../../../test/utils/sleep";
+import { TxRaw } from "@cosmjs/stargate/build/codec/cosmos/tx/v1beta1/tx";
 
 export class NativeDexClient {
   protected constructor(
@@ -44,7 +45,7 @@ export class NativeDexClient {
     return instance;
   }
 
-  async createSigningClient(signer: OfflineSigner) {
+  async createSigningClient(signerAddress: string, signer: OfflineSigner) {
     const createCustomTypesForModule = (
       nativeModule: Record<string, GeneratedType | any> & {
         protobufPackage: string;
@@ -74,7 +75,35 @@ export class NativeDexClient {
       },
     );
 
-    return client;
+    const rpcClient = {
+      request: async (service: string, method: string, data: Uint8Array) => {
+        const typeUrl = `/${service}${method}`;
+        const lookup = nativeRegistry.lookupType(typeUrl);
+        if (!lookup) throw new Error("Invalid message " + typeUrl);
+
+        const decoded = lookup.decode(data);
+        await client.signAndBroadcast(
+          signerAddress,
+          [
+            {
+              typeUrl,
+              value: decoded,
+            },
+          ],
+          client.fees.delegate,
+        );
+        // None of the protobufs have defined response types...
+        return new Uint8Array();
+      },
+    };
+
+    return {
+      client,
+      ethbridge: new EthbridgeV1Tx.MsgClientImpl(rpcClient),
+      tokenregistry: new TokenRegistryV1Tx.MsgClientImpl(rpcClient),
+      clp: new CLPV1Tx.MsgClientImpl(rpcClient),
+      dispensation: new DispensationV1Tx.MsgClientImpl(rpcClient),
+    };
   }
 
   private static createQueryClient(t34: Tendermint34Client) {

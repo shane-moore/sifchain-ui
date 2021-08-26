@@ -6,14 +6,23 @@ import {
   LiquidityProvider,
   Network,
   Pool,
+  getChainsService,
 } from "../../entities";
 
 import { SifUnSignedClient } from "../utils/SifClient";
 import { toPool } from "../utils/SifClient/toPool";
 import { RawPool } from "../utils/SifClient/x/clp";
+import { once } from "../../utils/once";
 import TokenRegistryService from "../../services/TokenRegistryService";
 import { NativeDexClient } from "../../services/utils/SifClient/NativeDexClient";
 import { PoolsRes } from "../../generated/proto/sifnode/clp/v1/querier";
+import { KeplrWalletProvider } from "../../clients/wallets";
+import { OfflineSigner } from "@cosmjs/launchpad";
+import { SigningStargateClient } from "@cosmjs/stargate";
+import {
+  MsgAddLiquidity,
+  MsgClientImpl as ClpMsgClientImpl,
+} from "../../generated/proto/sifnode/clp/v1/tx";
 
 export type ClpServiceContext = {
   nativeAsset: IAsset;
@@ -71,6 +80,14 @@ export default function createClpService({
 }: ClpServiceContext): IClpService {
   const client = sifUnsignedClient;
   const dexClientPromise = NativeDexClient.connect(sifRpcUrl);
+  const getSignedDexClient = once(async (address: string) => {
+    const dexClient = await dexClientPromise;
+    const keplr = KeplrWalletProvider.create({ sifRpcUrl });
+    return dexClient.createSigningClient(
+      address,
+      await keplr.getSendingSigner(getChainsService().get(Network.SIFCHAIN)),
+    );
+  });
 
   const tokenRegistry = TokenRegistryService({ sifRpcUrl });
 
@@ -111,16 +128,15 @@ export default function createClpService({
       const externalAssetEntry = await tokenRegistry.findAssetEntryOrThrow(
         params.externalAssetAmount.asset,
       );
-      return await client.addLiquidity({
-        base_req: { chain_id: sifChainId, from: params.fromAddress },
-        external_asset: {
-          source_chain: params.externalAssetAmount.asset.network as string,
-          symbol: externalAssetEntry.denom,
-          ticker: params.externalAssetAmount.asset.symbol,
-        },
-        external_asset_amount: params.externalAssetAmount.toBigInt().toString(),
-        native_asset_amount: params.nativeAssetAmount.toBigInt().toString(),
+      const signedClient = await getSignedDexClient(params.fromAddress);
+
+      return signedClient.clp.AddLiquidity({
         signer: params.fromAddress,
+        externalAsset: {
+          symbol: externalAssetEntry.denom,
+        },
+        externalAssetAmount: params.externalAssetAmount.toBigInt().toString(),
+        nativeAssetAmount: params.nativeAssetAmount.toBigInt().toString(),
       });
     },
 
@@ -128,17 +144,15 @@ export default function createClpService({
       const externalAssetEntry = await tokenRegistry.findAssetEntryOrThrow(
         params.externalAssetAmount.asset,
       );
+      const signedClient = await getSignedDexClient(params.fromAddress);
 
-      return await client.createPool({
-        base_req: { chain_id: sifChainId, from: params.fromAddress },
-        external_asset: {
-          source_chain: params.externalAssetAmount.asset.homeNetwork as string,
-          symbol: externalAssetEntry.denom,
-          ticker: params.externalAssetAmount.asset.symbol,
-        },
-        external_asset_amount: params.externalAssetAmount.toBigInt().toString(),
-        native_asset_amount: params.nativeAssetAmount.toBigInt().toString(),
+      return await signedClient.clp.CreatePool({
         signer: params.fromAddress,
+        externalAsset: {
+          symbol: externalAssetEntry.denom,
+        },
+        externalAssetAmount: params.externalAssetAmount.toBigInt().toString(),
+        nativeAssetAmount: params.nativeAssetAmount.toBigInt().toString(),
       });
     },
 
@@ -149,21 +163,18 @@ export default function createClpService({
       const receivedAssetEntry = await tokenRegistry.findAssetEntryOrThrow(
         params.receivedAsset,
       );
-      return await client.swap({
-        base_req: { chain_id: sifChainId, from: params.fromAddress },
-        received_asset: {
-          source_chain: params.receivedAsset.network as string,
-          symbol: receivedAssetEntry.denom,
-          ticker: receivedAssetEntry.baseDenom,
-        },
-        sent_amount: params.sentAmount.toBigInt().toString(),
-        sent_asset: {
-          source_chain: params.sentAmount.asset.network as string,
-          symbol: sentAssetEntry.denom,
-          ticker: sentAssetEntry.baseDenom,
-        },
-        min_receiving_amount: params.minimumReceived.toBigInt().toString(),
+      const signedClient = await getSignedDexClient(params.fromAddress);
+
+      return await signedClient.clp.Swap({
         signer: params.fromAddress,
+        receivedAsset: {
+          symbol: receivedAssetEntry.denom,
+        },
+        sentAmount: params.sentAmount.toBigInt().toString(),
+        sentAsset: {
+          symbol: sentAssetEntry.denom,
+        },
+        minReceivingAmount: params.minimumReceived.toBigInt().toString(),
       });
     },
     async getLiquidityProvider(params) {
@@ -200,16 +211,15 @@ export default function createClpService({
       const externalAssetEntry = await tokenRegistry.findAssetEntryOrThrow(
         params.asset,
       );
-      return await client.removeLiquidity({
-        asymmetry: params.asymmetry,
-        base_req: { chain_id: sifChainId, from: params.fromAddress },
-        external_asset: {
-          source_chain: params.asset.network as string,
-          symbol: externalAssetEntry.denom,
-          ticker: params.asset.symbol,
-        },
+      const signedClient = await getSignedDexClient(params.fromAddress);
+
+      return signedClient.clp.RemoveLiquidity({
         signer: params.fromAddress,
-        w_basis_points: params.wBasisPoints,
+        asymmetry: params.asymmetry,
+        externalAsset: {
+          symbol: externalAssetEntry.denom,
+        },
+        wBasisPoints: params.wBasisPoints,
       });
     },
   };
