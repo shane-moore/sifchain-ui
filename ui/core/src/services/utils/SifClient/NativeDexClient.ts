@@ -31,6 +31,7 @@ import { BroadcastTxCommitResponse } from "@cosmjs/tendermint-rpc/build/tendermi
 import { SimulationResponse } from "@cosmjs/stargate/build/codec/cosmos/base/abci/v1beta1/abci";
 import { sleep } from "../../../test/utils/sleep";
 import { TxRaw } from "@cosmjs/stargate/build/codec/cosmos/tx/v1beta1/tx";
+import { MsgClientImpl } from "@cosmjs/stargate/build/codec/cosmos/bank/v1beta1/tx";
 
 export class NativeDexClient {
   protected constructor(
@@ -82,7 +83,7 @@ export class NativeDexClient {
         if (!lookup) throw new Error("Invalid message " + typeUrl);
 
         const decoded = lookup.decode(data);
-        await client.signAndBroadcast(
+        const broadcastRes = await client.signAndBroadcast(
           signerAddress,
           [
             {
@@ -92,13 +93,14 @@ export class NativeDexClient {
           ],
           client.fees.delegate,
         );
-        // None of the protobufs have defined response types...
+
+        // Return this to stick with type contract for Rpc.. this sucks.
+        // Would ilke to return the tx to the application.
         return new Uint8Array();
       },
     };
 
     return {
-      client,
       ethbridge: new EthbridgeV1Tx.MsgClientImpl(rpcClient),
       tokenregistry: new TokenRegistryV1Tx.MsgClientImpl(rpcClient),
       clp: new CLPV1Tx.MsgClientImpl(rpcClient),

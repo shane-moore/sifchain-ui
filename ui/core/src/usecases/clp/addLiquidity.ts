@@ -3,6 +3,7 @@ import {
   getErrorMessage,
   IAssetAmount,
   Asset,
+  TransactionStatus,
 } from "../../entities";
 import { Services } from "../../services";
 import { Store } from "../../store";
@@ -50,26 +51,27 @@ export function AddLiquidity(
 
     const provideLiquidity = hasPool ? clp.addLiquidity : clp.createPool;
 
-    const tx = await provideLiquidity({
+    await provideLiquidity({
       fromAddress: state.address,
       nativeAssetAmount,
       externalAssetAmount,
     });
-
-    const txStatus = await sif.signAndBroadcast(tx.value.msg);
-
-    if (txStatus.state !== "accepted") {
-      // Edge case where we have run out of native balance and need to represent that
-      if (txStatus.code === ErrorCode.TX_FAILED_USER_NOT_ENOUGH_BALANCE) {
-        return reportTransactionError({
-          ...txStatus,
-          code: ErrorCode.TX_FAILED_NOT_ENOUGH_ROWAN_TO_COVER_GAS,
-          memo: getErrorMessage(
-            ErrorCode.TX_FAILED_NOT_ENOUGH_ROWAN_TO_COVER_GAS,
-          ),
-        });
-      }
-    }
-    return txStatus;
+    return {
+      state: "accepted",
+      hash: "",
+    } as TransactionStatus;
+    // if (txStatus.state !== "accepted") {
+    //   // Edge case where we have run out of native balance and need to represent that
+    //   if (txStatus.code === ErrorCode.TX_FAILED_USER_NOT_ENOUGH_BALANCE) {
+    //     return reportTransactionError({
+    //       ...txStatus,
+    //       code: ErrorCode.TX_FAILED_NOT_ENOUGH_ROWAN_TO_COVER_GAS,
+    //       memo: getErrorMessage(
+    //         ErrorCode.TX_FAILED_NOT_ENOUGH_ROWAN_TO_COVER_GAS,
+    //       ),
+    //     });
+    //   }
+    // }
+    // return txStatus;
   };
 }

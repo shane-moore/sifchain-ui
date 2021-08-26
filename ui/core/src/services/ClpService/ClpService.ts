@@ -12,7 +12,6 @@ import {
 import { SifUnSignedClient } from "../utils/SifClient";
 import { toPool } from "../utils/SifClient/toPool";
 import { RawPool } from "../utils/SifClient/x/clp";
-import { once } from "../../utils/once";
 import TokenRegistryService from "../../services/TokenRegistryService";
 import { NativeDexClient } from "../../services/utils/SifClient/NativeDexClient";
 import { PoolsRes } from "../../generated/proto/sifnode/clp/v1/querier";
@@ -23,6 +22,7 @@ import {
   MsgAddLiquidity,
   MsgClientImpl as ClpMsgClientImpl,
 } from "../../generated/proto/sifnode/clp/v1/tx";
+import memoize from "lodash/memoize";
 
 export type ClpServiceContext = {
   nativeAsset: IAsset;
@@ -80,7 +80,7 @@ export default function createClpService({
 }: ClpServiceContext): IClpService {
   const client = sifUnsignedClient;
   const dexClientPromise = NativeDexClient.connect(sifRpcUrl);
-  const getSignedDexClient = once(async (address: string) => {
+  const getSignedDexClient = memoize(async (address: string) => {
     const dexClient = await dexClientPromise;
     const keplr = KeplrWalletProvider.create({ sifRpcUrl });
     return dexClient.createSigningClient(
