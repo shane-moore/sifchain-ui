@@ -103,7 +103,7 @@ export default defineComponent({
                 <NavSidePanelItem
                   displayName="Swap"
                   icon="navigation/swap"
-                  href="/swap"
+                  href="https://dex.sifchain.finance/#/swap"
                 />
                 <NavSidePanelItem
                   displayName="Balances"
