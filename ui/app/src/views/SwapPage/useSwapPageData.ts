@@ -62,10 +62,6 @@ export const useSwapPageData = () => {
   const toAmount = ref("0");
   const slippage = ref<string>(currentSwapInput.slippage || "1.0");
 
-  onMounted(() => {
-    fromAmount.value = toAmount.value = "0";
-  });
-
   useBoundRoute({
     query: {
       from: fromSymbol,
