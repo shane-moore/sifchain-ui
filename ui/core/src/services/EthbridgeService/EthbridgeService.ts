@@ -256,6 +256,7 @@ export default function createEthbridgeService({
         const bridgeBankContract = await getBridgeBankContract(
           web3,
           bridgebankContractAddress,
+          sifChainId,
         );
         const accounts = await web3.eth.getAccounts();
         const coinDenom =
@@ -345,6 +346,7 @@ export default function createEthbridgeService({
       const bridgeBankContract = await getBridgeBankContract(
         web3,
         bridgebankContractAddress,
+        sifChainId,
       );
 
       const txs = await getEventTxsInBlockrangeFromAddress(
@@ -391,6 +393,7 @@ export default function createEthbridgeService({
         const bridgeBankContract = await getBridgeBankContract(
           web3,
           bridgebankContractAddress,
+          sifChainId,
         );
         const accounts = await web3.eth.getAccounts();
         const coinDenom = assetAmount.asset.address;
@@ -440,6 +443,7 @@ export default function createEthbridgeService({
       const bridgeBankContract = await getBridgeBankContract(
         web3,
         bridgebankContractAddress,
+        sifChainId,
       );
 
       const possibleSymbols = [
@@ -471,6 +475,18 @@ export default function createEthbridgeService({
           return tokenAddress;
         }
       }
+    },
+
+    async fetchLockedSymbolAddress(
+      symbol: string,
+      loadWeb3Instance: () => Promise<Web3> | Web3 = ensureWeb3,
+    ) {
+      const bridgebank = await getBridgeBankContract(
+        await loadWeb3Instance(),
+        bridgebankContractAddress,
+        sifChainId,
+      );
+      return bridgebank.methods.getLockedTokenAddress(symbol);
     },
 
     async fetchAllTokenAddresses(
