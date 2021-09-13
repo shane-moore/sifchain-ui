@@ -25,4 +25,3 @@ export async function getBridgeBankContract(
     address,
   ));
 }
-// bump

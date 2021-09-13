@@ -15,9 +15,22 @@ export function symbolWithoutPrefix(symbol: string) {
   return symbol.toLowerCase().replace(/^(c|e|u|x)/, "");
 }
 
+import config from "../networks/sifchain/config.devnet.json";
+
+const loader = createAssetLoader(NetworkEnv.DEVNET, {
+  ...config,
+  getWeb3Provider: async () => {
+    return new Web3.providers.HttpProvider(
+      "https://ropsten.infura.io/v3/7bf7bd5d44fd4f5eb081b580df2a2121",
+    );
+  },
+});
+
+loader.
+
 export default function createAssetLoader(
   networkEnv: NetworkEnv,
-  context: EthbridgeServiceContext & {
+  context: {
     sifRpcUrl: string;
     sifChainId: string;
     bridgebankContractAddress: string;
@@ -36,7 +49,10 @@ export default function createAssetLoader(
     return findChainConfigMatchingChainId(chainId)?.network;
   };
 
-  return async function loadAssets() {
+  return {
+    loadAssets 
+  }
+  async function loadAssets() {
     const entries = await registry.load();
 
     const nativeChainAssets: IAsset[] = [];
@@ -78,7 +94,6 @@ export default function createAssetLoader(
       ethSymbolLookup[asset.symbol] = ethSymbol;
     }
 
-    const ethbridge = createEthbridgeService(context);
     const ethAssets: IAsset[] = [];
 
     for (let asset of nativeChainAssets) {
@@ -97,17 +112,15 @@ export default function createAssetLoader(
           ...asset,
           symbol: ethSymbol,
           address: lockAddress && !!+lockAddress ? lockAddress : bridgeAddress,
+          network: Network.ETHEREUM,
+          homeNetwork: asset.homeNetwork === Network.SIFCHAIN ? Network.ETHEREUM : asset.homeNetwork
         });
       }
     }
-  };
 
-  // const ethbridgeService = createEthbridgeService(context);
-  // const getBridgebankContract = async () => {
-  //   return getBridgeBankContract(
-  //     new Web3(await context.getWeb3Provider()),
-  //     context.bridgebankContractAddress,
-  //     context.sifChainId,
-  //   );
-  // };
+    return [
+      ...nativeChainAssets,
+      ...ethAssets
+    ]
+  };
 }
