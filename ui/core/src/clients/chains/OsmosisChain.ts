@@ -10,7 +10,4 @@ export class OsmosisChain extends BaseChain implements Chain {
   getBlockExplorerUrlForAddress(hash: string) {
     return urlJoin(this.chainConfig.blockExplorerUrl, "account", hash);
   }
-  calculateTransferFeeToChain(transferAmount: IAssetAmount) {
-    return calculateIBCExportFee(transferAmount);
-  }
 }

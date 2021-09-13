@@ -10,7 +10,4 @@ export class SentinelChain extends BaseChain implements Chain {
   getBlockExplorerUrlForAddress(address: string) {
     return urlJoin(this.chainConfig.blockExplorerUrl, "accounts", address);
   }
-  calculateTransferFeeToChain(transferAmount: IAssetAmount) {
-    return calculateIBCExportFee(transferAmount);
-  }
 }

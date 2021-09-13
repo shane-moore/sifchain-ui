@@ -870,6 +870,28 @@ const assets: {
       homeNetwork: "ethereum",
       decimals: 18,
     },
+    {
+      symbol: "uluna",
+      displaySymbol: "luna",
+      decimals: 6,
+      name: "luna",
+      network: "sifchain",
+      label: "luna",
+      imageUrl:
+        "https://assets.coingecko.com/coins/images/8284/small/luna1557227471663.png?1567147072",
+      homeNetwork: "terra",
+    },
+    {
+      symbol: "uusd",
+      displaySymbol: "TerraUSD",
+      decimals: 6,
+      name: "TerraUSD",
+      network: "sifchain",
+      label: "TerraUSD",
+      imageUrl:
+        "https://assets.coingecko.com/coins/images/12681/small/UST.png?1601612407",
+      homeNetwork: "terra",
+    },
   ],
 };
 

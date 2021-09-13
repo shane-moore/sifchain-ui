@@ -16,6 +16,7 @@ import {
   PersistenceChain,
   RegenChain,
   OsmosisChain,
+  TerraChain,
 } from "../../clients/chains";
 
 export * from "../../clients/chains";
@@ -36,6 +37,7 @@ export const networkChainCtorLookup = {
   [Network.PERSISTENCE]: PersistenceChain,
   [Network.REGEN]: RegenChain,
   [Network.OSMOSIS]: OsmosisChain,
+  [Network.TERRA]: TerraChain,
 };
 
 export class ChainsService {

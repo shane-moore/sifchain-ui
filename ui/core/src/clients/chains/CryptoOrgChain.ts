@@ -10,7 +10,4 @@ export class CryptoOrgChain extends BaseChain implements Chain {
   getBlockExplorerUrlForAddress(address: string) {
     return urlJoin(this.chainConfig.blockExplorerUrl, "account", address);
   }
-  calculateTransferFeeToChain(transferAmount: IAssetAmount) {
-    return calculateIBCExportFee(transferAmount);
-  }
 }

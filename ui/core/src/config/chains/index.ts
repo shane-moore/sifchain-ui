@@ -7,10 +7,11 @@ import sentinel from "./sentinel";
 import cryptoOrg from "./crypto-org";
 import persistence from "./persistence";
 import regen from "./regen";
+import osmosis from "./osmosis";
+import terra from "./terra";
 
 import { NetworkEnv } from "../getEnv";
 import { Network } from "../../entities";
-import osmosis from "./osmosis";
 
 export const chainConfigByNetworkEnv = Object.fromEntries(
   Object.values(NetworkEnv).map((env) => {
@@ -27,6 +28,7 @@ export const chainConfigByNetworkEnv = Object.fromEntries(
         [Network.OSMOSIS]: osmosis[env],
         [Network.PERSISTENCE]: persistence[env],
         [Network.REGEN]: regen[env],
+        [Network.TERRA]: terra[env],
       },
     ];
   }),

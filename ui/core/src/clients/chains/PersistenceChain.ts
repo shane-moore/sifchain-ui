@@ -10,7 +10,4 @@ export class PersistenceChain extends BaseChain implements Chain {
   getBlockExplorerUrlForAddress(address: string) {
     return urlJoin(this.chainConfig.blockExplorerUrl, "wallet", address);
   }
-  calculateTransferFeeToChain(transferAmount: IAssetAmount) {
-    return calculateIBCExportFee(transferAmount);
-  }
 }
