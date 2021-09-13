@@ -264,3 +264,8 @@ export const assetMetadataLookup: Record<string, Partial<IAsset>> = {
     decommissioned: true,
   },
 };
+
+export const ethSymbolLookup: Record<string, string> = {
+  cdaofi: "DAOfi",
+  csusd: "sUSD",
+};

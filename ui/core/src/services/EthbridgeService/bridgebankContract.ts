@@ -47,7 +47,7 @@ export async function bridgeBankFetchTokenAddress(
     // IBC assets with dedicated decimal-precise contracts are uppercase
     asset.displaySymbol.toUpperCase(),
     // remove c prefix
-    asset.symbol.replace(/^c/, ""),
+    asset.symbol.replace(/^c/, "").toUpperCase(),
     // remove e prefix
     asset.symbol.replace(/^e/, ""),
     // display symbol goes before ibc denom because the dedicated decimal-precise contracts
@@ -56,7 +56,9 @@ export async function bridgeBankFetchTokenAddress(
     asset.ibcDenom,
     asset.symbol,
     "e" + asset.symbol,
-  ].filter(Boolean);
+  ]
+    .filter(Boolean)
+    .filter((item, index, arr) => arr.indexOf(item) === index);
   for (let symbol of possibleSymbols) {
     // Fetch the token address from bridgebank
     let tokenAddress = await bridgeBankContract.methods

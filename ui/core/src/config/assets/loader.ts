@@ -9,7 +9,7 @@ import { IAsset, Asset, Network } from "../../entities";
 
 import { NetworkEnv } from "../getEnv";
 import { chainConfigByNetworkEnv } from "../chains";
-import { assetMetadataLookup } from "./metadata";
+import { assetMetadataLookup, ethSymbolLookup } from "./metadata";
 import createEthbridgeService, {
   EthbridgeServiceContext,
 } from "services/EthbridgeService";
@@ -18,16 +18,13 @@ export function symbolWithoutPrefix(symbol: string) {
   return symbol.toLowerCase().replace(/^(c|e|u|x)/, "");
 }
 
-import config from "../networks/sifchain/config.devnet.json";
+import config from "../networks/sifchain/config.mainnet.json";
 import { getWeb3Provider } from "test/utils/getWeb3Provider";
+import { getMetamaskProvider } from "../../services";
 
-const loader = createAssetLoader(NetworkEnv.DEVNET, {
+const loader = createAssetLoader(NetworkEnv.MAINNET, {
   ...config,
-  getWeb3Provider: async () => {
-    return new Web3.providers.HttpProvider(
-      "https://ropsten.infura.io/v3/7bf7bd5d44fd4f5eb081b580df2a2121",
-    );
-  },
+  getWeb3Provider: getMetamaskProvider,
 });
 
 (async () => {
@@ -61,43 +58,49 @@ export default function createAssetLoader(
   async function loadAssets() {
     const entries = await registry.load();
 
-    const nativeChainAssets: IAsset[] = [];
-
-    const ethSymbolLookup: Record<string, string> = {};
+    let nativeChainAssets: IAsset[] = [];
 
     for (let entry of entries) {
-      const homeNetwork = !entry.ibcCounterpartyChainId
-        ? Network.SIFCHAIN
-        : findNetworkMatchingChainId(entry.ibcCounterpartyChainId);
+      try {
+        const homeNetwork = !entry.ibcCounterpartyChainId
+          ? Network.SIFCHAIN
+          : findNetworkMatchingChainId(entry.ibcCounterpartyChainId);
 
-      if (!homeNetwork) {
-        throw new Error(
-          "Registry entry has no matching chain id " + JSON.stringify(entry),
-        );
+        if (!homeNetwork) {
+          throw "Registry entry has no matching chain id";
+        }
+
+        const displaySymbol =
+          entry.displaySymbol || symbolWithoutPrefix(entry.baseDenom);
+        const asset: IAsset = {
+          decimals: entry.decimals.toNumber(),
+          symbol: entry.baseDenom,
+          displaySymbol,
+          name: entry.displayName || displaySymbol,
+          label: entry.displayName || displaySymbol,
+          network: Network.SIFCHAIN,
+          homeNetwork,
+          ibcDenom: entry.denom?.startsWith("ibc/") ? entry.denom : undefined,
+          ...assetMetadataLookup[entry.baseDenom],
+        };
+        nativeChainAssets.push(asset);
+
+        if (!ethSymbolLookup[asset.symbol]) {
+          let ethSymbol = entry.externalSymbol?.toLowerCase();
+          if (!ethSymbol && asset.symbol === "rowan") {
+            ethSymbol = "erowan";
+          } else if (asset.homeNetwork === Network.SIFCHAIN) {
+            ethSymbol = asset.symbol.replace(/^c/, "");
+          } else {
+            ethSymbol = asset.symbol;
+          }
+          ethSymbolLookup[asset.symbol] = ethSymbol.toUpperCase();
+        }
+      } catch (error) {
+        console.log("skip", entry);
+        console.error(error);
+        continue;
       }
-
-      const asset: IAsset = {
-        decimals: entry.decimals.toNumber(),
-        name: entry.displayName || entry.baseDenom,
-        label: entry.displayName || entry.baseDenom,
-        symbol: entry.baseDenom,
-        displaySymbol:
-          entry.displaySymbol || symbolWithoutPrefix(entry.baseDenom),
-        network: Network.SIFCHAIN,
-        homeNetwork,
-        ...assetMetadataLookup[entry.baseDenom],
-      };
-      nativeChainAssets.push(asset);
-
-      let ethSymbol = entry.externalSymbol?.toLowerCase();
-      if (!ethSymbol && asset.symbol === "rowan") {
-        ethSymbol = "erowan";
-      } else if (asset.homeNetwork === Network.SIFCHAIN) {
-        ethSymbol = asset.symbol.replace(/^c/, "");
-      } else {
-        ethSymbol = asset.symbol;
-      }
-      ethSymbolLookup[asset.symbol] = ethSymbol;
     }
 
     const web3 = new Web3(await context.getWeb3Provider());
@@ -109,37 +112,49 @@ export default function createAssetLoader(
 
     const ethAssets: IAsset[] = [];
 
-    for (let asset of nativeChainAssets) {
-      const ethSymbol = ethSymbolLookup[asset.symbol];
-      const bridgeAddress = await bridgeBankFetchTokenAddress(
-        web3,
-        context.bridgebankContractAddress,
-        context.sifChainId,
-        asset,
-      );
-      let lockAddress;
-      if (
-        (!bridgeAddress || !+bridgeAddress) &&
-        asset.homeNetwork === Network.SIFCHAIN
-      ) {
-        lockAddress = await bridgeContract.methods.getLockedTokenAddress(
-          ethSymbol,
-        );
-      }
+    // nativeChainAssets = nativeChainAssets.filter((a) => a.symbol === "c1inch");
 
-      if (bridgeAddress || lockAddress) {
-        ethAssets.push({
-          ...asset,
-          symbol: ethSymbol,
-          address: lockAddress && !!+lockAddress ? lockAddress : bridgeAddress,
-          network: Network.ETHEREUM,
-          homeNetwork:
-            asset.homeNetwork === Network.SIFCHAIN
-              ? Network.ETHEREUM
-              : asset.homeNetwork,
-        });
+    for (let asset of nativeChainAssets) {
+      try {
+        const ethSymbol = ethSymbolLookup[asset.symbol];
+        let lockAddress;
+        if (asset.homeNetwork === Network.SIFCHAIN) {
+          lockAddress = await bridgeContract.methods
+            .getLockedTokenAddress(ethSymbol)
+            .call();
+        }
+
+        let bridgeAddress;
+        if (!+lockAddress) {
+          bridgeAddress = await bridgeBankFetchTokenAddress(
+            web3,
+            context.bridgebankContractAddress,
+            context.sifChainId,
+            asset,
+          );
+        }
+        console.log(asset.symbol, { ethSymbol, bridgeAddress, lockAddress });
+
+        if (bridgeAddress || lockAddress) {
+          ethAssets.push({
+            ...asset,
+            symbol: ethSymbol,
+            address:
+              lockAddress && !!+lockAddress ? lockAddress : bridgeAddress,
+            network: Network.ETHEREUM,
+            homeNetwork:
+              asset.homeNetwork === Network.SIFCHAIN
+                ? Network.ETHEREUM
+                : asset.homeNetwork,
+          });
+        }
+      } catch (error) {
+        console.log("skip", asset);
+        console.error(error);
+        continue;
       }
     }
+    console.log({ ethAssets });
 
     return [...nativeChainAssets, ...ethAssets];
   }
