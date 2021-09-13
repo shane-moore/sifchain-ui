@@ -1,11 +1,14 @@
 import TokenRegistry from "../../services/TokenRegistryService";
-import { getBridgeBankContract } from "../../services/EthbridgeService/bridgebankContract";
+import {
+  getBridgeBankContract,
+  bridgeBankFetchTokenAddress,
+} from "../../services/EthbridgeService/bridgebankContract";
 import Web3 from "web3";
 import { provider } from "web3-core";
 import { IAsset, Asset, Network } from "../../entities";
 
 import { NetworkEnv } from "../getEnv";
-import { chainConfigByNetworkEnv } from "config/chains";
+import { chainConfigByNetworkEnv } from "../chains";
 import { assetMetadataLookup } from "./metadata";
 import createEthbridgeService, {
   EthbridgeServiceContext,
@@ -16,6 +19,7 @@ export function symbolWithoutPrefix(symbol: string) {
 }
 
 import config from "../networks/sifchain/config.devnet.json";
+import { getWeb3Provider } from "test/utils/getWeb3Provider";
 
 const loader = createAssetLoader(NetworkEnv.DEVNET, {
   ...config,
@@ -26,7 +30,9 @@ const loader = createAssetLoader(NetworkEnv.DEVNET, {
   },
 });
 
-loader.
+(async () => {
+  console.log(await loader.loadAssets());
+})();
 
 export default function createAssetLoader(
   networkEnv: NetworkEnv,
@@ -50,8 +56,8 @@ export default function createAssetLoader(
   };
 
   return {
-    loadAssets 
-  }
+    loadAssets,
+  };
   async function loadAssets() {
     const entries = await registry.load();
 
@@ -94,17 +100,31 @@ export default function createAssetLoader(
       ethSymbolLookup[asset.symbol] = ethSymbol;
     }
 
+    const web3 = new Web3(await context.getWeb3Provider());
+    const bridgeContract = await getBridgeBankContract(
+      web3,
+      context.bridgebankContractAddress,
+      context.sifChainId,
+    );
+
     const ethAssets: IAsset[] = [];
 
     for (let asset of nativeChainAssets) {
       const ethSymbol = ethSymbolLookup[asset.symbol];
-      const bridgeAddress = await ethbridge.fetchTokenAddress(asset);
+      const bridgeAddress = await bridgeBankFetchTokenAddress(
+        web3,
+        context.bridgebankContractAddress,
+        context.sifChainId,
+        asset,
+      );
       let lockAddress;
       if (
         (!bridgeAddress || !+bridgeAddress) &&
         asset.homeNetwork === Network.SIFCHAIN
       ) {
-        lockAddress = await ethbridge.fetchLockedSymbolAddress(ethSymbol);
+        lockAddress = await bridgeContract.methods.getLockedTokenAddress(
+          ethSymbol,
+        );
       }
 
       if (bridgeAddress || lockAddress) {
@@ -113,14 +133,14 @@ export default function createAssetLoader(
           symbol: ethSymbol,
           address: lockAddress && !!+lockAddress ? lockAddress : bridgeAddress,
           network: Network.ETHEREUM,
-          homeNetwork: asset.homeNetwork === Network.SIFCHAIN ? Network.ETHEREUM : asset.homeNetwork
+          homeNetwork:
+            asset.homeNetwork === Network.SIFCHAIN
+              ? Network.ETHEREUM
+              : asset.homeNetwork,
         });
       }
     }
 
-    return [
-      ...nativeChainAssets,
-      ...ethAssets
-    ]
-  };
+    return [...nativeChainAssets, ...ethAssets];
+  }
 }
