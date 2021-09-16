@@ -45,6 +45,11 @@ export interface BridgeTxEvents {
 export const BridgeTxEmitter = new EventEmitter() as TypedEmitter<BridgeTxEvents>;
 
 export abstract class BaseBridge<TxType> {
+  abstract registerConnection(params: {
+    source: Chain;
+    destination: Chain;
+    estimate;
+  }): Promise<void>;
   abstract estimateFees(
     params: BridgeParams,
   ): Promise<IAssetAmount | undefined>;
