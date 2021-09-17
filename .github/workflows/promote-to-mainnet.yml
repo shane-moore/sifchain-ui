@@ -1,18 +1,18 @@
-name: Promote build to mainnet
+name: Promote Cloudflare Build
 on:
   workflow_dispatch:
     inputs:
       source_dnslink:
-        description: 'Copy value from this record ID on Cloudflare'
+        description: 'Copy value from record ID'
         required: true
         default: '_dnslink.ipfs-staging'
       dest_dnslink:
-        description: 'Set value to this record ID on Cloudflare'
+        description: 'to record ID'
         required: true
         default: '_dnslink.ipfs-dex'
 
 jobs:
-  flip_to_mainnet:
+  copy_dnslink:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,15 +29,17 @@ jobs:
 
           success=$(jq -r  '.success' <<< "${response}" )
 
+          echo "Response: (echo $response | jq)"
           if [ $success != "true" ]; then
             echo "Pages Update: Failed to read record '${{github.event.inputs.source_dnslink}}'"
             errors=$(jq -r  '.errors' <<< "${response}")
-            echo "Errors: $errors" exit 1
+            exit 1
           fi
 
           DNSLINK_RECORD=$(jq -r  '.result[0].content' <<< "${response}" )
+          echo "$DNSLINK_RECORD"
           echo "RECORD_DOMAIN=sifchain.finance" >> $GITHUB_ENV
-          echo "RECORD_NAME={{ github.events.inputs.dest_dnslink }}" >> $GITHUB_ENV
+          echo "RECORD_NAME=${{github.events.inputs.dest_dnslink}}" >> $GITHUB_ENV
           echo "DNSLINK_RECORD=$DNSLINK_RECORD" >> $GITHUB_ENV
           echo "env: $(cat $GITHUB_ENV)"
 
