@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
     inputs:
       source_dnslink:
-        description: 'Source record ID on Cloudflare to copy from'
+        description: 'Copy value from this record ID on Cloudflare'
         required: true
         default: '_dnslink.ipfs-staging'
       dest_dnslink:
-        description: 'Target record ID on Cloudflare to set'
+        description: 'Set value to this record ID on Cloudflare'
         required: true
         default: '_dnslink.ipfs-dex'
 
@@ -20,16 +20,16 @@ jobs:
         shell: bash
         run: |
           response=$(curl \
-            -H "Authorization: Bearer $CLOUDFLARE_TOKEN" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -s "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/dns_records?name=sifchain.finance.${{ github.event.inputs.source_dnslink }}")
+            -s "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/dns_records?name=sifchain.finance.${{ github.event.inputs.source_dnslink }}")
 
           success=$(jq -r  '.success' <<< "${response}" )
 
           if [ $success != "true" ]; then
             echo "Pages Update: Failed to read record '${{ github.event.inputs.source_dnslink }}'"
             errors=$(jq -r  '.errors' <<< "${response}")
-            jcho "Errors: $errors" exit 1
+            echo "Errors: $errors" exit 1
           fi
 
           DNSLINK_RECORD=$(jq -r  '.result[0].content' <<< "${response}" )
