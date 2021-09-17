@@ -17,17 +17,20 @@ jobs:
 
     steps:
       - name: Get value of given dnslink and set to env.DNSLINK_RECORD
+        env:
+          CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_TOKEN_ZONE_ID }}
         shell: bash
         run: |
           response=$(curl \
-            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_TOKEN }}" \
+            -H "Authorization: Bearer $CLOUDFLARE_TOKEN" \
             -H "Content-Type: application/json" \
-            -s "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/dns_records?name=sifchain.finance.${{ github.event.inputs.source_dnslink }}")
+            -s "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/dns_records?name=sifchain.finance.${{github.event.inputs.source_dnslink}}")
 
           success=$(jq -r  '.success' <<< "${response}" )
 
           if [ $success != "true" ]; then
-            echo "Pages Update: Failed to read record '${{ github.event.inputs.source_dnslink }}'"
+            echo "Pages Update: Failed to read record '${{github.event.inputs.source_dnslink}}'"
             errors=$(jq -r  '.errors' <<< "${response}")
             echo "Errors: $errors" exit 1
           fi
