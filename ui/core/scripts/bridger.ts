@@ -1,58 +1,53 @@
 import { createSdk } from "../src/setup";
 import { NetworkEnv, AssetAmount, toBaseUnits } from "../src";
 import {
-  WalletProviderContext,
   DirectSecp256k1HdWalletProvider,
+  Web3WalletProvider,
+  WalletProvider,
 } from "../src/clients/wallets";
+
+import HDWalletProvider from "@truffle/hdwallet-provider";
+import { BridgeParams } from "../src/clients/bridges/BaseBridge";
 
 const sdk = createSdk({
   environment: NetworkEnv.DEVNET,
-  wallets: {
-    cosmos: (context: WalletProviderContext) => {
-      return new DirectSecp256k1HdWalletProvider(context, {
-        mnemonic: process.env.COSMOS_MNEMONIC || "",
-      });
-    },
+});
+
+const cosmosWallet = new DirectSecp256k1HdWalletProvider(sdk.context, {
+  mnemonic: process.env.COSMOS_MNEMONIC || "",
+});
+const web3Wallet = new Web3WalletProvider(sdk.context, {
+  getWeb3Provider: async () => {
+    return new HDWalletProvider({
+      mnemonic: {
+        phrase: process.env.ETH_MNEMONIC || "",
+      },
+      providerOrUrl: process.env.ETH_HTTP_PROVIDER_URL!,
+      chainId: 3,
+    });
   },
 });
 
 (async () => {
-  const sifAddress = await sdk.wallets.cosmos.connect(sdk.chains.sifchain);
-  const sifBalances = await sdk.wallets.cosmos.fetchBalances(
-    sdk.chains.sifchain,
-    sifAddress,
-  );
-  const cosmoshubAddress = await sdk.wallets.cosmos.connect(
-    sdk.chains.cosmoshub,
-  );
-  const cosmoshubBalances = await sdk.wallets.cosmos.fetchBalances(
-    sdk.chains.cosmoshub,
-    cosmoshubAddress,
-  );
-
-  const photon = sdk.chains.cosmoshub.lookupAssetOrThrow("uphoton");
-
-  const executable = sdk.bridges.ibc.transfer({
-    fromAddress: cosmoshubAddress,
-    fromChain: sdk.chains.cosmoshub,
-    toAddress: sifAddress,
+  const erowan = sdk.chains.ethereum.findAssetWithLikeSymbolOrThrow("erowan");
+  const params = {
+    fromChain: sdk.chains.ethereum,
+    fromAddress: await web3Wallet.connect(sdk.chains.ethereum),
     toChain: sdk.chains.sifchain,
-    assetAmount: AssetAmount(photon, toBaseUnits("1", photon)),
-  });
+    toAddress: await cosmosWallet.connect(sdk.chains.sifchain),
+    assetAmount: AssetAmount(erowan, toBaseUnits("0.01", erowan)),
+  };
 
-  executable.execute();
+  await sdk.bridges.eth.approveTransfer(web3Wallet, params);
 
-  for await (const ev of executable.generator()) {
-    console.log("event!", ev);
-  }
+  const bridgeTx = await sdk.bridges.eth.transfer(web3Wallet, params);
 
-  const bridgeTx = await executable.awaitResult();
-  console.log("bridgeTx", bridgeTx);
-  if (bridgeTx) {
-    for await (const status of sdk.bridges.ibc.subscribeToTransfer(bridgeTx)) {
-      console.log(status);
-    }
-  }
+  await sdk.bridges.eth.waitForTransferComplete(
+    web3Wallet,
+    bridgeTx,
+    console.log.bind(console, "update"),
+  );
+  console.log("done!");
 })();
 
 /*
