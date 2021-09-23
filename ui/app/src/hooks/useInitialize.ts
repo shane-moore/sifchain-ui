@@ -77,7 +77,9 @@ export function useInitialize() {
   }, 500);
 
   services.ethbridge
-    .addEthereumAddressToPeggyCompatibleCosmosAssets()
+    .addEthereumAddressToPeggyCompatibleCosmosAssets(
+      services.wallet.metamaskProvider,
+    )
     .then(() => {
       async function generateUniswapWhitelist() {
         const whitelist = {
@@ -101,6 +103,7 @@ export function useInitialize() {
                     );
                     if (!asset) return;
                     const addressOfToken = await services.ethbridge.fetchTokenAddress(
+                      services.wallet.metamaskProvider,
                       asset,
                     );
                     const tokenContract = new web3.eth.Contract(
