@@ -71,6 +71,7 @@ const fetchCoingeckoPrices = async (cgSymbols: string[]) => {
     { geckoId: "usd-coin", symbol: "cusdc" },
     { geckoId: "paid-network", symbol: "cpaid" },
     { geckoId: "rio-defi", symbol: "crfuel" },
+    { geckoId: "crypto-com-chain", symbol: "ccro" },
   ];
 
   const allGeckoPrices = await fetchCoingeckoPrices(
