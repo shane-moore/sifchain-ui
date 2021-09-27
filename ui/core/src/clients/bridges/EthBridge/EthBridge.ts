@@ -127,12 +127,17 @@ export class EthBridge extends BaseBridge<
     this.assertValidBridgeParams(wallet, params);
 
     if (wallet instanceof Web3WalletProvider) {
+      const tx = new NativeDexTransaction(params.fromAddress, [
+        new Web3Transaction(this.context.bridgebankContractAddress),
+      ]);
       return wallet.approve(
         params.fromChain,
-        new NativeDexTransaction(params.fromAddress, [
-          new Web3Transaction(this.context.bridgebankContractAddress),
-        ]),
-        params.assetAmount,
+        tx,
+        await wallet.getRequiredApprovalAmount(
+          params.fromChain,
+          tx,
+          params.assetAmount,
+        ),
       );
     }
   }
@@ -142,7 +147,6 @@ export class EthBridge extends BaseBridge<
     params: BridgeParams,
   ) {
     this.assertValidBridgeParams(wallet, params);
-    const web3 = new Web3(await this.context.getWeb3Provider());
 
     if (wallet instanceof CosmosWalletProvider) {
       const tx = await this.exportToEth(wallet, params);
@@ -151,11 +155,10 @@ export class EthBridge extends BaseBridge<
         throw new Error(parseTxFailure(tx).memo);
       }
 
-      const startingHeight = await web3.eth.getBlockNumber();
-
       return {
         type: "eth",
-        startingHeight,
+        // No web3 preovider is available here, this will be updated in the waitForTransferComplete fn below
+        startingHeight: 0,
         confirmCount: 0,
         completionConfirmCount: 0,
         ...params,
@@ -164,13 +167,16 @@ export class EthBridge extends BaseBridge<
         toChain: params.toChain,
       } as EthBridgeTx;
     } else {
+      const web3 = await wallet.getWeb3();
       const pegTx = await this.importFromEth(wallet, params);
       const startingHeight = await web3.eth.getBlockNumber();
 
       try {
         const hash = await new Promise<string>((resolve, reject) => {
+          let hash = "";
           pegTx.onError((error) => reject(error.payload));
-          pegTx.onTxHash((hash) => resolve(hash.txHash));
+          pegTx.onTxHash((ev) => (hash = ev.payload));
+          pegTx.onEthTxConfirmed(() => resolve(hash));
         });
 
         return {
@@ -319,6 +325,11 @@ export class EthBridge extends BaseBridge<
       );
 
       let startingHeight = ethTx.startingHeight;
+      if (startingHeight === 0) {
+        startingHeight = await web3.eth.getBlockNumber();
+        onUpdateTx?.({ startingHeight });
+      }
+
       return new Promise<boolean>((resolve, reject) => {
         // wait for the money on this token to hit
         contract.events.Transfer(

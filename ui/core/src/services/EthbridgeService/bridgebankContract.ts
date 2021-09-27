@@ -1,5 +1,6 @@
 import Web3 from "web3";
 import { AbiItem } from "web3-utils";
+import fetch from "cross-fetch";
 
 let abisPromise: Promise<AbiItem[]>;
 function fetchBridgebankContractAbis(sifChainId: string) {

@@ -57,6 +57,7 @@
     "@metamask/inpage-provider": "^7.0.0",
     "@openapitools/openapi-generator-cli": "^2.3.7",
     "@openzeppelin/test-helpers": "^0.5.11",
+    "@truffle/hdwallet-provider": "^1.5.0",
     "@types/big.js": "^6.0.0",
     "@types/inflection": "^1.5.28",
     "@types/jest": "^26.0.14",
