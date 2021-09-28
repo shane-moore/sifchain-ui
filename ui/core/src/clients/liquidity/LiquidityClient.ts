@@ -10,8 +10,15 @@ import {
 } from "../../entities";
 import { NativeDexClient } from "../../services/utils/SifClient/NativeDexClient";
 import { format } from "../../utils";
-import { slipAdjustment } from "../../entities/formulae";
+import { slipAdjustment, calculateWithdrawal } from "../../entities/formulae";
 import TokenRegistryService from "../../services/TokenRegistryService";
+
+type RemoveLiquidityParams = {
+  pool: Pool;
+  liquidityProvider: LiquidityProvider;
+  asymmetry: number;
+  basisPoints: number;
+};
 
 export type LiquidityContext = {
   sifApiUrl: string;
@@ -24,10 +31,10 @@ export const DEFAULT_SWAP_SLIPPAGE_PERCENT = 1.5;
 export class LiquidityClient {
   constructor(public context: LiquidityContext, public nativeChain: Chain) {}
 
-  tokenRegistry = TokenRegistryService(this.context);
+  private tokenRegistry = TokenRegistryService(this.context);
 
   private nativeDexClientPromise?: Promise<NativeDexClient>;
-  async getNativeDexClient() {
+  private async getNativeDexClient() {
     if (!this.nativeDexClientPromise) {
       this.nativeDexClientPromise = NativeDexClient.connectByChain(
         this.nativeChain,
@@ -36,6 +43,9 @@ export class LiquidityClient {
     return this.nativeDexClientPromise;
   }
 
+  /**
+   * Fetch all available liquidity pools.
+   */
   async fetchAllPools() {
     const client = await this.getNativeDexClient();
     const res = await client.query.clp.GetPools({});
@@ -65,6 +75,9 @@ export class LiquidityClient {
       .filter((i) => i != null) as Pool[];
   }
 
+  /*
+   * Fetch the liquidity pool associated with the given external asset.
+   */
   async fetchPool(params: { asset: IAsset }) {
     const client = await this.getNativeDexClient();
 
@@ -86,6 +99,10 @@ export class LiquidityClient {
     return pool;
   }
 
+  /*
+   * Fetch liquidity provider data for the given address (if it exists)
+   * matching the given external asset.
+   */
   async fetchLiquidityProvider(params: { address: string; asset: IAsset }) {
     const client = await this.getNativeDexClient();
     const entry = await this.tokenRegistry.findAssetEntryOrThrow(params.asset);
@@ -242,11 +259,74 @@ export class LiquidityClient {
     return txDraft;
   }
 
-  async fetchRemoveLiquidityQuote(params: {}) {}
+  private assertValidRemoveLiquidityParams(params: RemoveLiquidityParams) {
+    if (!(params.asymmetry <= -1 && params.asymmetry >= 1)) {
+      throw new Error(
+        `params.asymmetry expected to be between -1 and 1, got ${params.asymmetry}`,
+      );
+    }
+    if (!(params.basisPoints > 0 && params.basisPoints <= 1)) {
+      throw new Error(
+        `params.basisPoints expected to be between >0 and <= 1, got ${params.basisPoints}`,
+      );
+    }
+    return params;
+  }
+  createRemoveLiquidityQuote(params: RemoveLiquidityParams) {
+    this.assertValidRemoveLiquidityParams(params);
+    const data = calculateWithdrawal({
+      poolUnits: params.pool.poolUnits,
+      nativeAssetBalance: params.liquidityProvider.nativeAmount,
+      externalAssetBalance: params.liquidityProvider.externalAmount,
+      lpUnits: params.liquidityProvider.units,
+      asymmetry: Amount(String(params.asymmetry * 10_000)),
+      wBasisPoints: Amount(String(params.basisPoints * 10_000)),
+    });
 
-  createRemoveLiquidityQuote(params: {}) {}
+    return {
+      withdrawNativeAssetAmount: data.withdrawNativeAssetAmount,
+      withdrawExternalAssetAmount: data.withdrawExternalAssetAmount,
+    };
+  }
 
-  async prepareRemoveLiquidityTx(params: {}) {}
+  async prepareRemoveLiquidityTx(params: RemoveLiquidityParams) {
+    this.assertValidRemoveLiquidityParams(params);
+    const client = await this.getNativeDexClient();
+
+    const externalAssetEntry = await this.tokenRegistry.findAssetEntryOrThrow(
+      params.pool.externalAmount,
+    );
+
+    return client.tx.clp.RemoveLiquidity(
+      {
+        asymmetry: String(params.asymmetry * 10_000),
+        wBasisPoints: String(params.basisPoints * 10_000),
+        externalAsset: {
+          symbol: externalAssetEntry.denom,
+        },
+        signer: params.liquidityProvider.address,
+      },
+      params.liquidityProvider.address,
+    );
+  }
+
+  findSwapPools(params: { fromAsset: IAsset; toAsset: IAsset; pools: Pool[] }) {
+    const isNativeAsset = (asset: IAsset) => asset.symbol === "rowan";
+    const fromPoolAsset = isNativeAsset(params.fromAsset)
+      ? params.toAsset
+      : params.fromAsset;
+    const fromPool = params.pools.find(
+      (p) => p.externalAmount.symbol === fromPoolAsset.symbol,
+    )!;
+
+    const toPool =
+      isNativeAsset(params.fromAsset) || isNativeAsset(params.toAsset)
+        ? fromPool
+        : params.pools.find(
+            (p) => p.externalAmount.symbol === params.toAsset.symbol,
+          )!;
+    return { fromPool, toPool };
+  }
 
   async fetchSwapQuote(params: {
     fromAmount: IAssetAmount;
@@ -255,11 +335,17 @@ export class LiquidityClient {
   }) {
     return this.createSwapQuote({
       ...params,
-      fromPool: (await this.fetchPool({ asset: params.fromAmount }))!,
-      toPool: (await this.fetchPool({ asset: params.toAsset }))!,
+      ...this.findSwapPools({
+        pools: await this.fetchAllPools(),
+        fromAsset: params.fromAmount,
+        toAsset: params.toAsset,
+      }),
     });
   }
 
+  /*
+   * Return a quote about how a swap is estimated to go based on passed in pools.
+   */
   createSwapQuote(params: {
     fromAmount: IAssetAmount;
     toAsset: IAsset;
