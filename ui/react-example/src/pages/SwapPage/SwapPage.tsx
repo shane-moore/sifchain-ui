@@ -1,28 +1,24 @@
 import React, { useState } from 'react'
-import { AssetAmount, formatAssetAmount, humanUnitsToAssetAmount, Pool, toBaseUnits } from '@sifchain/sdk'
+import { AssetAmount, formatAssetAmount, toBaseUnits } from '@sifchain/sdk'
 import { sdk } from '../../sdk'
-import { useRecoilState, useRecoilValue } from 'recoil'
-import {
-  fromAmountState,
-  fromAssetState,
-  fromToPoolState,
-  poolsState,
-  swapQuoteState,
-  toAmountState,
-  toAssetState,
-} from './state'
+import { useSwapContext } from './context'
 
 export default function SwapPage() {
-  const [fromAsset, setFromAsset] = useRecoilState(fromAssetState)
-  const [toAsset, setToAsset] = useRecoilState(toAssetState)
-  const [fromAmount, setFromAmount] = useRecoilState(fromAmountState)
-  const [toAmount, setToAmount] = useRecoilState(toAmountState)
-  const [, setPools] = useRecoilState(poolsState)
-  const fromToPool = useRecoilValue(fromToPoolState)
-
-  const [slippagePercent, setSlippagePercent] = useState(1)
-
-  const [swapQuote, setSwapQuote] = useRecoilState(swapQuoteState)
+  const {
+    fromAsset,
+    setFromAsset,
+    toAsset,
+    setToAsset,
+    fromAmount,
+    setFromAmount,
+    toAmount,
+    setToAmount,
+    fromToPool,
+    slippagePercent,
+    setSlippagePercent,
+    swapQuote,
+    setSwapQuote,
+  } = useSwapContext()
 
   const fromAmountInputRef = React.useRef<HTMLInputElement | null>(null)
   const toAmountInputRef = React.useRef<HTMLInputElement | null>(null)
@@ -60,9 +56,10 @@ export default function SwapPage() {
 
   // re-calculate amounts when assets or pools change
   React.useEffect(() => {
+    if (!fromToPool) return
     // Don't recalculate from amount when pool changes if from is already focused.
-    const shouldChangeKey = document.activeElement === fromAmountInputRef.current ? 'toAmount' : 'fromAmount'
-    if (fromToPool) onInputChange(shouldChangeKey, shouldChangeKey === 'fromAmount' ? fromAmount : toAmount)
+    const keyToChange = document.activeElement === fromAmountInputRef.current ? 'toAmount' : 'fromAmount'
+    onInputChange(keyToChange, keyToChange === 'fromAmount' ? fromAmount : toAmount)
   }, [fromToPool, slippagePercent])
 
   return (
