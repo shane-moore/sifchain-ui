@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { AssetAmount, formatAssetAmount, humanUnitsToAssetAmount, Pool, toBaseUnits } from '@sifchain/sdk'
 import { sdk } from '../../sdk'
 import { useRecoilState, useRecoilValue } from 'recoil'
@@ -20,19 +20,12 @@ export default function SwapPage() {
   const [, setPools] = useRecoilState(poolsState)
   const fromToPool = useRecoilValue(fromToPoolState)
 
+  const [slippagePercent, setSlippagePercent] = useState(1)
+
   const [swapQuote, setSwapQuote] = useRecoilState(swapQuoteState)
 
   const fromAmountInputRef = React.useRef<HTMLInputElement | null>(null)
   const toAmountInputRef = React.useRef<HTMLInputElement | null>(null)
-
-  React.useEffect(() => {
-    let timeoutId: NodeJS.Timeout
-    ;(async function run() {
-      setPools(await sdk.liquidity.fetchAllPools())
-      timeoutId = setTimeout(run, 10_000)
-    })()
-    return () => clearTimeout(timeoutId)
-  }, [])
 
   const onInputChange = (key: 'fromAmount' | 'toAmount', amount: string) => {
     amount = String(parseFloat(amount) || '0')
@@ -45,10 +38,12 @@ export default function SwapPage() {
         key === 'fromAmount'
           ? {
               ...fromToPool,
+              slippagePercent,
               fromAmount: assetAmount,
             }
           : {
               ...fromToPool,
+              slippagePercent,
               toAmount: assetAmount,
             },
       )
@@ -68,12 +63,11 @@ export default function SwapPage() {
     // Don't recalculate from amount when pool changes if from is already focused.
     const shouldChangeKey = document.activeElement === fromAmountInputRef.current ? 'toAmount' : 'fromAmount'
     if (fromToPool) onInputChange(shouldChangeKey, shouldChangeKey === 'fromAmount' ? fromAmount : toAmount)
-  }, [fromToPool])
+  }, [fromToPool, slippagePercent])
 
   return (
     <div>
       <h3>Swap</h3>
-
       <button
         onClick={() => {
           setFromAsset(toAsset)
@@ -88,7 +82,6 @@ export default function SwapPage() {
         Switch
       </button>
       <hr />
-
       <label>
         From
         <select
@@ -128,6 +121,50 @@ export default function SwapPage() {
           onChange={e => onInputChange('toAmount', e.target.value)}
         />
       </label>
+      <hr />
+      Slippage:
+      <label>
+        <input
+          type="radio"
+          name="slippage"
+          className="ml-1"
+          checked={slippagePercent === 0.5}
+          onClick={() => setSlippagePercent(0.5)}
+        />
+        0.5%
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="slippage"
+          className="ml-1"
+          checked={slippagePercent === 1}
+          onClick={() => setSlippagePercent(1)}
+        />
+        1%
+      </label>
+      <label>
+        <input type="radio" name="slippage" checked={slippagePercent === 1.5} onClick={() => setSlippagePercent(1.5)} />
+        1.5%
+      </label>
+      <hr />
+      {!!swapQuote && (
+        <ul>
+          <li>
+            Price: {swapQuote.fromToRatio} {fromAsset.displaySymbol.toUpperCase()} per{' '}
+            {toAsset.displaySymbol.toUpperCase()}
+          </li>
+          <li>
+            Minimum received: {formatAssetAmount(swapQuote.minimumReceived)}{' '}
+            {swapQuote.minimumReceived.displaySymbol.toUpperCase()}
+          </li>
+          <li>Price impact: {swapQuote.priceImpact}%</li>
+          <li>
+            Liquidity Provider Fee: {formatAssetAmount(swapQuote.providerFee)}{' '}
+            {swapQuote.providerFee.displaySymbol.toUpperCase()}
+          </li>
+        </ul>
+      )}
     </div>
   )
 }

@@ -30,16 +30,6 @@ export const toAmountState = atom({
   default: '0',
 })
 
-export const fromAssetAmountState = selector({
-  key: 'swap/fromAssetAmount',
-  get: ({ get }) => humanUnitsToAssetAmount(get(fromAssetState), get(fromAmountState)),
-})
-
-export const toAssetAmountState = selector({
-  key: 'swap/fromAssetAmount',
-  get: ({ get }) => humanUnitsToAssetAmount(get(toAssetState), get(toAmountState)),
-})
-
 export const poolsState = atom<Pool[]>({
   key: 'swap/pools',
   default: [],

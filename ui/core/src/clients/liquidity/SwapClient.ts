@@ -30,7 +30,11 @@ export type LiquidityContext = {
 export const DEFAULT_SWAP_SLIPPAGE_PERCENT = 1.5;
 
 export class SwapClient extends BaseLiquidityClient {
-  findSwapPools(params: { fromAsset: IAsset; toAsset: IAsset; pools: Pool[] }) {
+  findSwapFromToPool(params: {
+    fromAsset: IAsset;
+    toAsset: IAsset;
+    pools: Pool[];
+  }) {
     const isNativeAsset = (asset: IAsset) => asset.symbol === "rowan";
     const fromPoolAsset = isNativeAsset(params.fromAsset)
       ? params.toAsset
@@ -89,6 +93,8 @@ export class SwapClient extends BaseLiquidityClient {
       toAmount,
     );
 
+    const isZero = fromAmount.equalTo("0") || toAmount.equalTo("0");
+
     return {
       flags: {
         insufficientLiquidity: insufficientFromLiquidity
@@ -99,13 +105,24 @@ export class SwapClient extends BaseLiquidityClient {
       },
       fromAmount,
       toAmount,
+      fromToRatio: isZero
+        ? "0"
+        : format(fromAmount.divide(toAmount), { mantissa: 6 }),
       minimumReceived: AssetAmount(
         toAmount,
-        Amount("1").subtract(
-          slippageAmount.divide(Amount("100")).multiply(toAmount),
-        ),
+        Amount("1")
+          .subtract(slippageAmount.divide(Amount("100")))
+          .multiply(toAmount),
       ),
-      providerFee: compositePool.calcProviderFee(fromAmount),
+      priceImpact: isZero
+        ? "0"
+        : format(compositePool.calcPriceImpact(fromAmount), {
+            mantissa: 6,
+            trimMantissa: true,
+          }),
+      providerFee: isZero
+        ? AssetAmount(this.nativeChain.nativeAsset, "0")
+        : compositePool.calcProviderFee(fromAmount),
     };
   }
 
