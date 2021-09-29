@@ -1,46 +1,51 @@
-# Getting Started with Create React App
+# vite-react-ts-tailwind-starter
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Starter using Vite + React + TypeScript + Tailwind.
 
-## Available Scripts
+## Motivation
 
-In the project directory, you can run:
+Improve building your faster prototyping by using Vite, TypeScript, React, TailwindCSS.
 
-### `yarn start`
+## Vite
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+[Vite](https://github.com/vitejs/vite) is a fast frontend build tool. According to the [README](https://github.com/vitejs/vite/blob/main/README.md), it consists of two major parts:
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+- A dev server that serves your source files over native ES modules, with rich built-in features and astonishingly fast Hot Module Replacement (HMR).
+- A build command that bundles your code with Rollup, pre-configured to output highly optimized static assets for production.
 
-### `yarn test`
+## React
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+[React](https://github.com/facebook/react) is a JavaScript library for building user interfaces.
 
-### `yarn build`
+Due to its awesome renderer system, there are many [React Renderor](https://github.com/chentsulin/awesome-react-renderer). So React can be not used only Web, for example, used by [React Native](https://reactnative.dev/).
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Let's dive into React and Vite can use with React.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## TypeScript
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+[TypeScript](https://github.com/microsoft/TypeScript) is a superset of JavaScript. It is just one of NPM library, but it provides an original compiler.
 
-### `yarn eject`
+When you use TypeScript with React, you can write JSX with TypeScript, called TSX. Then you can develop views written by  **Type-Safe** template.
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## Tailwind CSS
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+[Tailwind CSS](https://tailwindcss.com/) is modern utility-first CSS framework. It provides many CSS rules, but these are purged when production builds. So developers do not worry about CSS asset size for performance optimization.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+In VSCode, I recommend to use [intellisense extension](https://tailwindcss.com/docs/intellisense).
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+Frequently, React developers are worried about how to write CSS in TSX(JSX) template. You must choose from CSS Modules, [styled-components](https://styled-components.com/), [linaria](https://github.com/callstack/linaria), and so on.
+Additionally, CSS architecture is difficult about scoping, e.g. BEM, FLOCSS.
 
-## Learn More
+When you decide to use Tailwind, you only write utility-first CSS classes, you don't have to worry about them!
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Formatter and Linter
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Already set up [ESLint](https://eslint.org/) and [Prettier](https://prettier.io/). You can customize the rules.
+
+NOTICE: The template does not use [eslint-plugin-prettier](https://github.com/prettier/eslint-plugin-prettier) and [prettier-eslint](https://github.com/prettier/prettier-eslint). So I recommend that running commands individually. e.g. `prettier && eslint`.
+
+Please read: https://prettier.io/docs/en/integrating-with-linters.html.
+
+# ToDo
+
+- [x] install and set up [TailwindCSS/JIT](https://github.com/tailwindlabs/tailwindcss-jit) see this [PR](https://github.com/TeXmeijin/vite-react-ts-tailwind-starter/pull/1)

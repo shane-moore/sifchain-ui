@@ -1,6 +1,5 @@
-import { createSdk } from "@sifchain/sdk/src/setup";
-import { NetworkEnv } from "@sifchain/sdk";
+import { NetworkEnv, createSdk } from '@sifchain/sdk'
 
 export const sdk = createSdk({
   environment: NetworkEnv.DEVNET,
-});
+})

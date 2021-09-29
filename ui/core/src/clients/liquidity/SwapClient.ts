@@ -27,16 +27,6 @@ export type LiquidityContext = {
   sifChainId: string;
 };
 
-export type SwapQuote = {
-  flags: {
-    insufficientLiquidity: "from" | "to" | "false";
-  };
-  fromAmount: IAssetAmount;
-  toAmount: IAssetAmount;
-  minimumReceived: IAssetAmount;
-  providerFee: IAssetAmount;
-};
-
 export const DEFAULT_SWAP_SLIPPAGE_PERCENT = 1.5;
 
 export class SwapClient extends BaseLiquidityClient {
