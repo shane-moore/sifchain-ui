@@ -78,10 +78,9 @@ async function swap(fromAssetAmount: IAssetAmount, toAsset: IAsset) {
 }
 
 async function ibcBridge(params: BridgeParams) {
-  const bridge = sdk.bridges.ibc;
-  console.log("start bridge");
+  console.log("start sdk.bridges.ibc");
   try {
-    await bridge.approveTransfer(cosmosWallet, params);
+    await sdk.bridges.ibc.approveTransfer(cosmosWallet, params);
   } catch (error) {
     console.log("approve error", error);
     return;
@@ -89,13 +88,40 @@ async function ibcBridge(params: BridgeParams) {
 
   let bridgeTx: BridgeTx;
   try {
-    bridgeTx = await bridge.transfer(cosmosWallet, params);
+    bridgeTx = await sdk.bridges.ibc.transfer(cosmosWallet, params);
   } catch (error) {
     console.log("send tx error", error);
   }
   try {
-    const didComplete = await bridge.waitForTransferComplete(
+    const didComplete = await sdk.bridges.ibc.waitForTransferComplete(
       cosmosWallet,
+      bridgeTx,
+      console.log.bind(console, "update..."),
+    );
+    console.log("did transfer complete?", didComplete);
+  } catch (error) {
+    console.log("Error waiting for transfer completion", error);
+  }
+}
+
+async function ethBridge(params: BridgeParams) {
+  console.log("start sdk.bridges.eth");
+  try {
+    await sdk.bridges.eth.approveTransfer(web3Wallet, params);
+  } catch (error) {
+    console.log("approve error", error);
+    return;
+  }
+
+  let bridgeTx: BridgeTx;
+  try {
+    bridgeTx = await sdk.bridges.eth.transfer(web3Wallet, params);
+  } catch (error) {
+    console.log("send tx error", error);
+  }
+  try {
+    const didComplete = await sdk.bridges.eth.waitForTransferComplete(
+      web3Wallet,
       bridgeTx,
       console.log.bind(console, "update..."),
     );
@@ -110,12 +136,22 @@ async function run() {
     AssetAmount(sdk.chains.sifchain.forceGetAsset("rowan"), "1000"),
     sdk.chains.sifchain.forceGetAsset("cusdt"),
   );
+
   const photon = sdk.chains.cosmoshub.forceGetAsset("uphoton");
   await ibcBridge({
     fromChain: sdk.chains.cosmoshub,
     toChain: sdk.chains.sifchain,
     assetAmount: AssetAmount(photon, toBaseUnits("1.0", photon)),
     fromAddress: await cosmosWallet.connect(sdk.chains.cosmoshub),
+    toAddress: await cosmosWallet.connect(sdk.chains.sifchain),
+  });
+
+  const eth = sdk.chains.ethereum.forceGetAsset("eth");
+  await ethBridge({
+    fromChain: sdk.chains.ethereum,
+    toChain: sdk.chains.sifchain,
+    assetAmount: AssetAmount(eth, toBaseUnits("0.01", eth)),
+    fromAddress: await web3Wallet.connect(sdk.chains.ethereum),
     toAddress: await cosmosWallet.connect(sdk.chains.sifchain),
   });
 }
