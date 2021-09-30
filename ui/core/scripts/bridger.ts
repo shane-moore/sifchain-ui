@@ -22,7 +22,7 @@ import { isBroadcastTxSuccess } from "@cosmjs/stargate";
 import { isBroadcastTxFailure } from "@cosmjs/launchpad";
 
 const sdk = createSdk({
-  environment: NetworkEnv.MAINNET,
+  environment: NetworkEnv.TESTNET,
 });
 
 const cosmosWallet = new DirectSecp256k1HdWalletProvider(sdk.context, {
