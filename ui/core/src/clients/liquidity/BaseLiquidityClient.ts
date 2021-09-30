@@ -22,7 +22,10 @@ export type LiquidityContext = {
 export const DEFAULT_SWAP_SLIPPAGE_PERCENT = 1;
 
 export class BaseLiquidityClient {
-  constructor(public context: LiquidityContext, public nativeChain: Chain) {}
+  constructor(
+    protected context: LiquidityContext,
+    protected nativeChain: Chain,
+  ) {}
 
   protected tokenRegistry = TokenRegistryService(this.context);
 
