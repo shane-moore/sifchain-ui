@@ -1,39 +1,54 @@
 import { Chain, IAssetAmount, Network } from '@sifchain/sdk'
-import { KeplrWalletProvider, MetamaskWalletProvider } from '@sifchain/sdk/src/clients/wallets'
 import React, { createContext, useContext, useMemo, useState } from 'react'
 import { sdk } from '../../sdk'
-
-const keplrProvider = new KeplrWalletProvider(sdk.context)
-const metamaskProvider = new MetamaskWalletProvider(sdk.context)
-
-if (typeof window !== 'undefined') {
-  metamaskProvider.onChainChanged(() => window.location.reload())
-  metamaskProvider.onAccountChanged(() => window.location.reload())
-  keplrProvider.onAccountChanged(() => window.location.reload())
-}
+import { keplrProvider, metamaskProvider } from './providers'
 
 type WalletState = {
   address: string
   connected: boolean
   balances: IAssetAmount[]
+  balanceLookup: Record<string, IAssetAmount>
 }
 
+const connectedKey = (chain: Chain) => 'connected_' + chain.network
+
 const useWalletData = () => {
-  const [state, setState] = useState(
-    Object.values(Network).reduce((acc, network) => {
-      acc[network] = {
+  const [accountState, setState] = useState(
+    Object.values(sdk.chains).reduce((acc, chain) => {
+      acc[chain.network] = {
         address: '',
         connected: false,
         balances: [],
+        balanceLookup: {},
       }
       return acc
     }, {} as Record<Network, WalletState>),
   )
 
+  React.useEffect(() => {
+    Object.values(sdk.chains).forEach(chain => {
+      if (localStorage[connectedKey(chain)]) {
+        connect(chain)
+      }
+    })
+  }, [])
+
+  React.useEffect(() => {
+    let timeoutId: NodeJS.Timeout
+    if (accountState.sifchain.connected) {
+      ;(async function run() {
+        await updateBalances(sdk.chains.sifchain)
+        timeoutId = setTimeout(run, 5000)
+      })()
+    }
+    return () => clearTimeout(timeoutId)
+  }, [accountState.sifchain.connected])
+
   const connect = React.useCallback(async (chain: Chain) => {
     const provider = chain.chainConfig.chainType === 'ibc' ? keplrProvider : metamaskProvider
 
     const address = await provider.connect(chain)
+    localStorage[connectedKey(chain)] = true
     updateChainState(chain, { connected: true, address })
     return address
   }, [])
@@ -48,18 +63,27 @@ const useWalletData = () => {
     }))
   }, [])
 
-  const fetchBalances = async (chain: Chain) => {
-    if (!state[chain.network].connected) return
-    const provider = chain.chainConfig.chainType === 'ibc' ? keplrProvider : metamaskProvider
-    const balances = await provider.fetchBalances(chain, state[chain.network].address)
-    updateChainState(chain, { balances })
-    return balances
-  }
+  const updateBalances = React.useCallback(
+    async (chain: Chain) => {
+      if (!accountState[chain.network].connected) return
+      const provider = chain.chainConfig.chainType === 'ibc' ? keplrProvider : metamaskProvider
+      const balances = await provider.fetchBalances(chain, accountState[chain.network].address)
+      updateChainState(chain, {
+        balances,
+        balanceLookup: balances.reduce((acc, balance) => {
+          acc[balance.symbol] = balance
+          return acc
+        }, {} as Record<string, IAssetAmount>),
+      })
+      return balances
+    },
+    [accountState],
+  )
 
   const value = {
-    state,
+    accountState,
     connect,
-    fetchBalances,
+    updateBalances,
   }
 
   return useMemo(() => value, Object.values(value))
@@ -68,7 +92,7 @@ const useWalletData = () => {
 // @ts-ignore
 const WalletContext = createContext<ReturnType<typeof useWalletData>>({})
 
-export const useWalletContext = () => useContext(WalletContext)
+export const useWalletContext = () => React.useContext(WalletContext)
 
 export const WalletProvider = (props: { children: any }) => {
   const data = useWalletData()

@@ -29,7 +29,7 @@ const useSwapPageData = () => {
 
   useEffect(() => {
     setFromToPool(sdk.liquidity.swap.findSwapFromToPool({ fromAsset, toAsset, pools }))
-  }, [pools])
+  }, [pools, fromAsset, toAsset])
 
   const value = {
     fromAsset,

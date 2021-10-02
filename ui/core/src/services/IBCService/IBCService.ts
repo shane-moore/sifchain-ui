@@ -8,8 +8,6 @@ import {
 } from "../../entities";
 import { BroadcastTxResult } from "@cosmjs/launchpad";
 
-export type { IBCServiceContext };
-
 // NOTE(ajoslin): this is deprecated, most functionality is moved to IBCBridge
 // debug functions only left here or functions with old signatures
 export class IBCService extends IBCBridge {
@@ -83,6 +81,7 @@ export class IBCService extends IBCBridge {
           const counterpartyChannelId = channel.counterparty!.channelId;
           const counterPartyChainId =
             parsedClientState.identified_client_state.client_state.chain_id;
+
           const counterpartyConfig = this.loadChainConfigByChainId(
             counterPartyChainId,
           );
@@ -158,6 +157,8 @@ export class IBCService extends IBCBridge {
     // }
   }
 }
+
+export { IBCServiceContext };
 
 export default function createIBCService(context: IBCServiceContext) {
   return IBCService.create(context);

@@ -18,7 +18,6 @@ import {
 
 import HDWalletProvider from "@truffle/hdwallet-provider";
 import { BridgeParams, BridgeTx } from "../src/clients/bridges/BaseBridge";
-import { isBroadcastTxSuccess } from "@cosmjs/stargate";
 import { isBroadcastTxFailure } from "@cosmjs/launchpad";
 
 const sdk = createSdk({

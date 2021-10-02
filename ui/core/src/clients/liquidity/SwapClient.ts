@@ -86,12 +86,12 @@ export class SwapClient extends BaseLiquidityClient {
     const toAmount =
       params.toAmount ?? compositePool.calcSwapResult(params.fromAmount);
 
-    const insufficientFromLiquidity = params.fromPool.externalAmount.lessThan(
-      fromAmount,
-    );
-    const insufficientToLiquidity = params.toPool.externalAmount.lessThan(
-      toAmount,
-    );
+    const insufficientFromLiquidity = params.fromPool.amounts
+      .find((a) => a.symbol === fromAmount.symbol)!
+      .lessThan(fromAmount);
+    const insufficientToLiquidity = params.toPool.amounts
+      .find((a) => a.symbol === toAmount.symbol)!
+      .lessThan(toAmount);
 
     const isZero = fromAmount.equalTo("0") || toAmount.equalTo("0");
 
