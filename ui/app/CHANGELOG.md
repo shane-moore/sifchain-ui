@@ -1,3 +1,26 @@
+## Release 2021.10.05
+* Enabled JUNØ
+* Sif's Bonus Pool - 1M Rowan. 2 weeks. 3 steps.
+  * Import JUNØ
+  * Pool JUNØ
+  * Earn Rowan
+  
+## Release 2021.10.03
+* Welcomed the Sif's Harvest Liquidity Mining Program 
+  * All pools. 
+  * 6 weeks
+  * 40 Million Rowan in Rewards
+
+## Release 2021.10.01
+* Enabled
+  * BTSG - BitSong
+  * QUICK - QuickSwap
+  * LDO - Lido DAO
+  * RAIL - Railgun
+  * POND - Marlin 
+  * DINO - DinoSwap
+  * UFO - UFO Gaming
+
 ## Release 2021.09.17
 
 * Ledger Nano X and Ledger Nano S are now supported!

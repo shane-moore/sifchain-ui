@@ -680,7 +680,7 @@ export default {
     },
     {
       symbol: "uusd",
-      displaySymbol: "TerraUSD",
+      displaySymbol: "ust",
       decimals: 6,
       name: "TerraUSD",
       network: "sifchain",
@@ -688,6 +688,16 @@ export default {
       imageUrl:
         "https://assets.coingecko.com/coins/images/12681/small/UST.png?1601612407",
       homeNetwork: "terra",
+    },
+    {
+      symbol: "ujuno",
+      displaySymbol: "juno",
+      decimals: 6,
+      name: "juno",
+      network: "sifchain",
+      label: "juno",
+      imageUrl: "https://junoscan.com/icons/safari-pinned-tab.svg",
+      homeNetwork: "juno",
     },
   ],
 };

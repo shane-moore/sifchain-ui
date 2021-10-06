@@ -36,19 +36,13 @@ export default function KeplrActions(context: UsecaseContext): WalletActions {
       };
     },
 
-    async getBalances(
-      network: Network,
-      address: string,
-      forceUpdate?: boolean,
-    ) {
+    async getBalances(network: Network, address: string) {
       const chain = chains.get(network);
-      if (forceUpdate) {
-        keplrProvider.refreshDenomTraces(chain);
-      }
 
       try {
         return keplrProvider.fetchBalances(chain, address);
       } catch (error) {
+        console.log("Retrying. Errored checking balances for " + network);
         // Give it ONE retry, sometimes the chain rpc apis fail once...
         return keplrProvider.fetchBalances(chain, address);
       }

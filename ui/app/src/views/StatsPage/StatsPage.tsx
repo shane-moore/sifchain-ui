@@ -13,8 +13,8 @@ export default defineComponent({
   props: {},
   setup() {
     const { res, statsRef, state } = useStatsPageData({
-      sortBy: "asset",
-      sortDirection: "asc",
+      sortBy: "rewardApy",
+      sortDirection: "desc",
     } as StatsPageState);
 
     const columns: Array<{

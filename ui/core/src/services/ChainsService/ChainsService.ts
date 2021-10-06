@@ -17,6 +17,7 @@ import {
   RegenChain,
   OsmosisChain,
   TerraChain,
+  JunoChain,
 } from "../../clients/chains";
 
 export * from "../../clients/chains";
@@ -38,6 +39,7 @@ export const networkChainCtorLookup = {
   [Network.REGEN]: RegenChain,
   [Network.OSMOSIS]: OsmosisChain,
   [Network.TERRA]: TerraChain,
+  [Network.JUNO]: JunoChain,
 };
 
 export class ChainsService {
@@ -87,6 +89,7 @@ export class ChainsService {
     setChainsService(this);
   }
 
+  // returns array of chains
   list() {
     return this._list;
   }

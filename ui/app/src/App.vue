@@ -23,6 +23,7 @@ import { Flags } from "@/components/Flags/Flags";
 import { useRoute, useRouter } from "vue-router";
 import { accountStore } from "./store/modules/accounts";
 import { Amount } from "@sifchain/sdk";
+import { shouldAllowFaucetFunding } from "@/hooks/useFaucet";
 import OnboardingModal from "@/components/OnboardingModal";
 
 // not currently working? - McCall
@@ -46,7 +47,7 @@ const hideRedundantUselessMetamaskErrors = () => {
 };
 hideRedundantUselessMetamaskErrors();
 
-const ROWAN_GAS_FEE = Amount("500000000000000000"); // 0.5 ROWAN
+const ROWAN_GAS_FEE = Amount("400000000000000000"); // 0.4 ROWAN
 
 let hasShownGetRowanModal = (() => {
   try {
@@ -71,6 +72,7 @@ export default defineComponent({
     EnvAlert,
     SideBar,
     Flags,
+    OnboardingModal,
   },
   computed: {
     key() {
@@ -99,10 +101,12 @@ export default defineComponent({
           b.asset.symbol.toLowerCase() !== "rowan" && b.amount.greaterThan("0"),
       );
       const shouldPossiblyShowOnboardingModal =
-        hasHadValidChanceToLoadBalances.value;
+        hasHadValidChanceToLoadBalances.value &&
+        accountStore.state.sifchain.hasLoadedBalancesOnce;
       if (
         !hasSufficientRowanToTrade &&
         hasImportedAssets &&
+        shouldAllowFaucetFunding() &&
         !hasShownGetRowanModal
       ) {
         hasShownGetRowanModal = true;
