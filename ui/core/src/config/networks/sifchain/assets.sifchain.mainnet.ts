@@ -683,7 +683,7 @@ const assets: {
       name: "Terra USD",
       label: "Terra USD",
       network: "sifchain",
-      displaySymbol: "UST (ERC-20)",
+      displaySymbol: "UST (ERC-20}",
       symbol: "cust",
       homeNetwork: "ethereum",
     },
@@ -883,7 +883,7 @@ const assets: {
     },
     {
       symbol: "uusd",
-      displaySymbol: "ust",
+      displaySymbol: "TerraUSD",
       decimals: 6,
       name: "TerraUSD",
       network: "sifchain",

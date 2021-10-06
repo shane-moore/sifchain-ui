@@ -679,6 +679,18 @@ export default {
       homeNetwork: "terra",
     },
     {
+      address: "0xa47c8bf37f92abed4a126bda807a7b7498661acd",
+      decimals: 18,
+      imageUrl:
+        "https://assets.coingecko.com/coins/images/12681/small/UST.png?1601612407",
+      name: "Terra USD",
+      label: "Terra USD",
+      network: "sifchain",
+      displaySymbol: "UST (ERC-20}",
+      symbol: "cust",
+      homeNetwork: "ethereum",
+    },
+    {
       symbol: "uusd",
       displaySymbol: "ust",
       decimals: 6,
