@@ -12,6 +12,7 @@ import { isLikeSymbol } from "@/utils/symbol";
 import { accountStore } from "@/store/modules/accounts";
 import { PendingTransferItem } from "@sifchain/sdk/src/store/tx";
 import { useAsyncData } from "./useAsyncData";
+import { useChains } from "./useChains";
 
 export type TokenListItem = {
   amount: IAssetAmount;
@@ -53,7 +54,11 @@ export const useTokenList = (params: TokenListParams) => {
         const pendingExports: PendingTransferItem[] = [];
         pendingTransfers.forEach((transfer) => {
           if (
-            isLikeSymbol(transfer.bridgeTx.assetAmount.symbol, asset.symbol)
+            isLikeSymbol(transfer.bridgeTx.assetAmount.symbol, asset.symbol) ||
+            isLikeSymbol(
+              transfer.bridgeTx.assetAmount.unitDenom || "",
+              asset.symbol,
+            )
           ) {
             const array =
               transfer.bridgeTx.toChain.network === asset.network
@@ -116,7 +121,7 @@ export const useAndPollNetworkBalances = (params: {
 }) => {
   const res = useAsyncData(async () => {
     if (!params.network.value) return;
-    return accountStore.updateBalances(params.network.value);
+    await accountStore.updateBalances(params.network.value);
   }, [params.network]);
 
   let stopPollingRef = ref<Promise<() => void> | undefined>();

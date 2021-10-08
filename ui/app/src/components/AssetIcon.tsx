@@ -51,7 +51,8 @@ export type InteractiveIconName =
   | "wallet"
   | "warning"
   | "settings"
-  | "picture";
+  | "picture"
+  | "check";
 
 export type NavIconName =
   | "balances"
@@ -64,7 +65,8 @@ export type NavIconName =
   | "rewards"
   | "rowan"
   | "stake"
-  | "swap";
+  | "swap"
+  | "harvest";
 
 export type IconName =
   | `navigation/${NavIconName}`

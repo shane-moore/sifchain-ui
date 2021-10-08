@@ -16,6 +16,8 @@ import {
   PersistenceChain,
   RegenChain,
   OsmosisChain,
+  JunoChain,
+  IxoChain,
 } from "../../clients/chains";
 
 export * from "../../clients/chains";
@@ -36,6 +38,8 @@ export const networkChainCtorLookup = {
   [Network.PERSISTENCE]: PersistenceChain,
   [Network.REGEN]: RegenChain,
   [Network.OSMOSIS]: OsmosisChain,
+  [Network.JUNO]: JunoChain,
+  [Network.IXO]: IxoChain,
 };
 
 export class ChainsService {
@@ -85,6 +89,7 @@ export class ChainsService {
     setChainsService(this);
   }
 
+  // returns array of chains
   list() {
     return this._list;
   }

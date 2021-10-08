@@ -11,6 +11,10 @@ import {
   NetworkEnv,
 } from "@sifchain/sdk";
 import { BridgeEvent } from "@sifchain/sdk/src/clients/bridges/BaseBridge";
+import {
+  Permission,
+  RegistryEntry,
+} from "../../../../core/src/generated/proto/sifnode/tokenregistry/v1/types";
 import { Vuextra } from "../Vuextra";
 import { accountStore } from "./accounts";
 import { flagsStore } from "./flags";
@@ -25,6 +29,12 @@ export type ExportDraft = {
 type State = {
   draft: ExportDraft;
 };
+
+let registry: RegistryEntry[] = [];
+useCore()
+  .services.tokenRegistry.load()
+  .then((r) => (registry = r));
+
 export const exportStore = Vuextra.createStore({
   name: "export",
   options: {
@@ -49,6 +59,9 @@ export const exportStore = Vuextra.createStore({
       const isPeggyWhitelistedIBCAsset = useCore()!.config.peggyCompatibleCosmosBaseDenoms.has(
         asset.symbol,
       );
+
+      const registryEntry = registry.find((e) => e.baseDenom === asset.symbol);
+
       return (
         useChainsList()
           .filter(
@@ -56,22 +69,17 @@ export const exportStore = Vuextra.createStore({
           )
           // Disallow IBC export of ethereum & sifchain-native tokens
           .filter((n) => {
-            if (NATIVE_TOKEN_IBC_EXPORTS_ENABLED) {
-              // return all tokens when native IBC exports are enabled
-              return true;
-            } else {
-              // if IBC exports are disabled
-              if (
-                // if it's rowan or an etherem token
-                !isExternalIBCAsset
-              ) {
-                // only show ethereum network
-                return n.network === Network.ETHEREUM;
-              } else {
-                // let them export any IBC token to any IBC network
-                return true;
-              }
-            }
+            // If it's from IBC network, of course you can export it anywhere.
+            if (isExternalIBCAsset) return true;
+
+            // Yep, you can export to eth (unless the next .filter below catches you).
+            if (n.network === Network.ETHEREUM) return true;
+
+            // Otherwise, only allow exporting to all networks token has permission.
+            return (
+              NATIVE_TOKEN_IBC_EXPORTS_ENABLED &&
+              registryEntry?.permissions.includes(Permission.IBCEXPORT)
+            );
           })
           .filter((c) => {
             if (isExternalIBCAsset && c.network === Network.ETHEREUM) {

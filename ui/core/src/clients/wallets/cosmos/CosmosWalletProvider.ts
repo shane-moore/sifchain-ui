@@ -7,6 +7,7 @@ import {
   IAssetAmount,
   AssetAmount,
   IAsset,
+  Asset,
 } from "../../../entities";
 import fetch from "cross-fetch";
 import {
@@ -29,8 +30,13 @@ import {
 } from "../../../services/utils/SifClient/NativeDexTransaction";
 import { BroadcastTxResult } from "@cosmjs/launchpad";
 import { NativeDexClient } from "../../../services/utils/SifClient/NativeDexClient";
+import { Coin } from "generated/proto/cosmos/base/coin";
+import { createIBCHash } from "../../../utils/createIBCHash";
 
-type IBCHashDenomTraceLookup = Record<string, DenomTrace>;
+type IBCHashDenomTraceLookup = Record<
+  string,
+  { isValid: boolean; denomTrace: DenomTrace }
+>;
 
 export abstract class CosmosWalletProvider extends WalletProvider<EncodeObject> {
   tokenRegistry: ReturnType<typeof TokenRegistryService>;
@@ -73,20 +79,7 @@ export abstract class CosmosWalletProvider extends WalletProvider<EncodeObject> 
     return chain.chainConfig as IBCChainConfig;
   }
 
-  async createIBCHash(message: string) {
-    const msgUint8 = new TextEncoder().encode(message); // encode as (utf-8) Uint8Array
-
-    if (typeof crypto === "undefined") {
-      global.crypto = require("crypto").webcrypto; // Node.js support
-    }
-
-    const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8); // hash the message
-    const hashArray = Array.from(new Uint8Array(hashBuffer)); // convert buffer to byte array
-    const hashHex = hashArray
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join(""); // convert bytes to hex string
-    return "ibc/" + hashHex.toUpperCase();
-  }
+  createIBCHash = createIBCHash;
 
   async getStargateClient(chain: Chain) {
     const chainConfig = this.getIBCChainConfig(chain);
@@ -123,121 +116,229 @@ export abstract class CosmosWalletProvider extends WalletProvider<EncodeObject> 
     );
   }
 
-  private denomTraceLookupByChain: Record<
+  private denomTracesCache: Record<
     string,
     Promise<IBCHashDenomTraceLookup>
   > = {};
-  async getIBCDenomTraceLookupCached(chain: Chain) {
+  async getIBCDenomTracesLookupCached(chain: Chain) {
     const chainId = chain.chainConfig.chainId;
-    if (!this.denomTraceLookupByChain[chainId]) {
-      const promise = this.getIBCDenomTraceLookup(chain);
-      this.denomTraceLookupByChain[chainId] = promise;
+    if (!this.denomTracesCache[chainId]) {
+      const promise = this.getIBCDenomTracesLookup(chain);
+      this.denomTracesCache[chainId] = promise;
       promise.catch((error) => {
-        delete this.denomTraceLookupByChain[chainId];
+        delete this.denomTracesCache[chainId];
         throw error;
       });
     }
-    return this.denomTraceLookupByChain[chainId];
+    return this.denomTracesCache[chainId];
   }
-  async getIBCDenomTraceLookup(chain: Chain): Promise<IBCHashDenomTraceLookup> {
+
+  async getIBCDenomTracesLookup(
+    chain: Chain,
+  ): Promise<IBCHashDenomTraceLookup> {
     const chainConfig = this.getIBCChainConfig(chain);
-    const denomTracesRes = await fetch(
-      `${chainConfig.restUrl}/ibc/applications/transfer/v1beta1/denom_traces`,
-    );
-    if (!denomTracesRes.ok)
-      throw new Error(`Failed to fetch denomTraces for ${chain.displayName}`);
-    const denomTracesJson = await denomTracesRes.json();
-    const denomTraces: DenomTrace[] = denomTracesJson.denom_traces.map(
-      (data: { path: string; base_denom: string }) => ({
-        path: data.path,
-        baseDenom: data.base_denom,
-      }),
-    );
+    const denomTraces = await (await this.getQueryClient(chain)).ibc.transfer
+      .allDenomTraces()
+      .catch(async (e) => {
+        const denomTracesRes = await fetch(
+          `${chainConfig.restUrl}/ibc/applications/transfer/v1beta1/denom_traces`,
+        );
+        if (!denomTracesRes.ok)
+          throw new Error(
+            `Failed to fetch denomTraces for ${chain.displayName}`,
+          );
+        const denomTracesJson = await denomTracesRes.json();
+        return denomTracesJson.denom_traces.map(
+          (denomTrace: any): DenomTrace => {
+            return {
+              path: denomTrace.path,
+              baseDenom: denomTrace.base_denom,
+            };
+          },
+        );
+      });
 
-    let validTraces: DenomTrace[] = [];
-
+    const hashToTraceMapping: IBCHashDenomTraceLookup = {};
+    for (let denomTrace of denomTraces.denomTraces) {
+      const [port, ...channelIds] = denomTrace.path.split("/");
+      const hash = await createIBCHash(
+        port,
+        channelIds[0],
+        denomTrace.baseDenom,
+      );
+      hashToTraceMapping[hash] = { isValid: false, denomTrace };
+    }
     if (chain.network === Network.SIFCHAIN) {
       // For sifchain, check for tokens that come from ANY ibc entry
+      try {
+        const ibcEntries = (await this.tokenRegistry.load()).filter(
+          (item) => !!item.ibcCounterpartyChannelId,
+        );
+        for (let [hash, item] of Object.entries(hashToTraceMapping)) {
+          hashToTraceMapping[hash].isValid = ibcEntries.some(
+            (entry) =>
+              item.denomTrace.path.startsWith(
+                "transfer/" + entry.ibcCounterpartyChannelId,
+              ) ||
+              item.denomTrace.path.startsWith("transfer/" + entry.ibcChannelId),
+          );
+        }
+      } catch (error) {
+        // invalid token we don't support anymore, ignore
+      }
+    } else {
+      try {
+        // For other networks, check for tokens that come from specific counterparty channel
+        const entry = await this.tokenRegistry.findAssetEntryOrThrow(
+          chain.nativeAsset,
+        );
+        const channelId = entry.ibcCounterpartyChannelId;
+        if (!channelId) {
+          throw new Error(
+            "Cannot trace denoms, not an IBC chain " + chain.displayName,
+          );
+        }
+        for (let [hash, item] of Object.entries(hashToTraceMapping)) {
+          hashToTraceMapping[hash].isValid = item.denomTrace.path.startsWith(
+            `transfer/${channelId}`,
+          );
+        }
+      } catch (error) {
+        // invalid token we don't support anymore, ignore
+      }
+    }
+
+    return hashToTraceMapping;
+  }
+
+  private individualDenomTraceCache: Record<
+    string,
+    Promise<DenomTrace | undefined>
+  > = {};
+  async getDenomTraceCached(chain: Chain, hash: string) {
+    hash = hash.replace("ibc/", "");
+
+    const key = chain.chainConfig.chainId + "_" + hash;
+    if (!this.individualDenomTraceCache[key]) {
+      this.individualDenomTraceCache[key] = this.getDenomTrace(
+        chain,
+        hash,
+      ).catch((error) => {
+        delete this.individualDenomTraceCache[key];
+        return Promise.reject(error);
+      });
+    }
+    return this.individualDenomTraceCache[key];
+  }
+
+  async getDenomTrace(
+    chain: Chain,
+    hash: string,
+  ): Promise<DenomTrace | undefined> {
+    const queryClient = await this.getQueryClient(chain);
+
+    const { denomTrace } = await queryClient.ibc.transfer.denomTrace(hash);
+    if (!denomTrace) {
+      return;
+    }
+
+    if (chain.network === Network.SIFCHAIN) {
+      // For sifchain, check if the token came from ANY counterparty network
       const ibcEntries = (await this.tokenRegistry.load()).filter(
         (item) => !!item.ibcCounterpartyChannelId,
       );
-      validTraces = denomTraces.filter((trace) => {
-        const lastChannelInPath = trace.path.split("/").pop();
-        return ibcEntries.some(
-          (entry) =>
-            entry.ibcChannelId === lastChannelInPath ||
-            entry.ibcCounterpartyChannelId === lastChannelInPath,
-        );
-      });
+      const isValid = ibcEntries.some(
+        (entry) =>
+          denomTrace.path.startsWith(
+            "transfer/" + entry.ibcCounterpartyChannelId,
+          ) || denomTrace.path.startsWith("transfer/" + entry.ibcChannelId),
+      );
+      if (!isValid) {
+        return;
+      }
     } else {
       // For other networks, check for tokens that come from specific counterparty channel
       const entry = await this.tokenRegistry.findAssetEntryOrThrow(
         chain.nativeAsset,
       );
       const channelId = entry.ibcCounterpartyChannelId;
-      if (!channelId) {
-        throw new Error(
-          "Cannot trace denoms, not an IBC chain " + chain.displayName,
-        );
+      if (!denomTrace.path.startsWith(`transfer/${channelId}`)) {
+        return;
       }
-      validTraces = denomTraces.filter((item) => {
-        return item.path.split("/").pop() === channelId;
-      });
     }
-
-    return Object.fromEntries(
-      await Promise.all(
-        validTraces.map(async (trace) => {
-          return [
-            await this.createIBCHash(`${trace.path}/${trace.baseDenom}`),
-            trace,
-          ];
-        }),
-      ),
-    );
+    return denomTrace;
   }
 
   async fetchBalances(chain: Chain, address: string): Promise<IAssetAmount[]> {
     const queryClient = await this.getQueryClient(chain);
     const balances = await queryClient?.bank.allBalances(address);
 
+    const denomTracesLookup = await this.getIBCDenomTracesLookupCached(chain);
+
     const assetAmounts: IAssetAmount[] = [];
 
-    const ibcDenomTraceLookup = await this.getIBCDenomTraceLookupCached(chain);
+    for (let coin of balances) {
+      if (!+coin.amount) continue;
 
-    await Promise.all(
-      balances.map(async (coin) => {
+      if (!coin.denom.startsWith("ibc/")) {
+        const asset = chain.lookupAsset(coin.denom);
+
         try {
-          if (!coin.denom.startsWith("ibc/")) {
-            const asset = chain.assets.find(
-              (asset) =>
-                asset.symbol.toLowerCase() === coin.denom.toLowerCase(),
-            );
-            assetAmounts.push(AssetAmount(asset || coin.denom, coin.amount));
-          } else {
-            const denomTrace = ibcDenomTraceLookup[coin.denom];
-            if (!denomTrace) return;
-
-            const baseDenom = denomTrace.baseDenom;
-
-            const asset = chain.assets.find(
-              (asset) => asset.symbol.toLowerCase() === baseDenom.toLowerCase(),
-            );
-            if (asset) {
-              asset.ibcDenom = coin.denom;
-            }
-            try {
-              const assetAmount = AssetAmount(asset || baseDenom, coin.amount);
-              assetAmounts.push(assetAmount);
-            } catch (error) {
-              // ignore asset, doesnt exist in our list.
-            }
-          }
+          // create asset it doesn't exist and is a precision-adjusted counterparty asset
+          const assetAmount = await this.tokenRegistry.loadNativeAssetAmount(
+            AssetAmount(asset || coin.denom, coin.amount),
+          );
+          assetAmounts.push(assetAmount);
         } catch (error) {
-          console.error(chain.network, "coin error", coin, error);
+          // invalid token, ignore
         }
-      }),
-    );
+      } else {
+        let lookupData = denomTracesLookup[coin.denom];
+        let denomTrace = lookupData?.denomTrace;
+        if (lookupData && !lookupData.isValid) {
+          continue;
+        } else if (!lookupData) {
+          // If it's not in the master list of all denom traces, that list may just be outdated...
+          // Newly minted tokens aren't added to the master list immediately.
+          // @ts-ignore
+          denomTrace = await this.getDenomTraceCached(chain, coin.denom);
+        }
+
+        if (!denomTrace) {
+          continue; // Ignore, it's an invalid coin from invalid chain
+        }
+
+        const registry = await this.tokenRegistry.load();
+        const entry = registry.find((e) => {
+          return e.baseDenom === denomTrace.baseDenom;
+        });
+        if (!entry) continue;
+
+        try {
+          const nativeAsset =
+            entry.unitDenom && entry.baseDenom !== entry.unitDenom
+              ? chain.lookupAssetOrThrow(entry.unitDenom)
+              : chain.lookupAssetOrThrow(entry.baseDenom);
+
+          let asset = chain.assets.find(
+            (asset) =>
+              asset.symbol.toLowerCase() === nativeAsset.symbol.toLowerCase(),
+          );
+          if (asset) {
+            asset.ibcDenom = coin.denom;
+          }
+          const counterpartyAsset = await this.tokenRegistry.loadCounterpartyAsset(
+            nativeAsset,
+          );
+          const assetAmount = AssetAmount(counterpartyAsset, coin.amount);
+          assetAmounts.push(
+            await this.tokenRegistry.loadNativeAssetAmount(assetAmount),
+          );
+        } catch (error) {
+          // ignore asset, doesnt exist in our list.
+        }
+      }
+    }
 
     return assetAmounts;
   }

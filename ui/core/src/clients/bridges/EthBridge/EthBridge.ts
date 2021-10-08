@@ -286,8 +286,8 @@ export class EthBridge extends BaseBridge<
     const ethTx = tx as EthBridgeTx;
     const web3 = await provider.getWeb3();
     if (ethTx.toChain.network === Network.SIFCHAIN) {
+      let done = false;
       return new Promise<boolean>((resolve, reject) => {
-        let done = false;
         const pegTx = this.createPegTx(
           provider,
           ETH_CONFIRMATIONS,
@@ -296,16 +296,15 @@ export class EthBridge extends BaseBridge<
         );
         this.subscribeToTx(pegTx, (ethTx: TransactionStatus) => {
           if (ethTx.state === "completed") {
-            done = true;
             resolve(true);
           } else if (ethTx.state === "failed") {
-            done = true;
             reject(new Error("Transaction failed"));
           }
         });
 
         (async () => {
           let confirmCount = ethTx.confirmCount;
+          const blockHeight = await web3.eth.getBlockNumber();
           while (!done) {
             const newCount = await getConfirmations(web3, ethTx.hash);
             if (newCount && newCount !== confirmCount) {
@@ -313,10 +312,28 @@ export class EthBridge extends BaseBridge<
               confirmCount = newCount;
             }
             await new Promise((resolve) => setTimeout(resolve, 5000));
+
+            if (blockHeight > ethTx.startingHeight + ETH_CONFIRMATIONS * 1.1) {
+              // In the cases a tx was sped up or canceled in metamask before
+              // it took off, we don't have an API to find out.
+              // https://github.com/ChainSafe/web3.js/issues/3723
+              // In this case, our transaction will timeout. Just quietly cancel
+              // our UI-side listen for the import after a grace period of expected
+              // confirmations + 10%.
+              resolve(false);
+              break;
+            }
           }
         })();
-      });
+      }).finally(() => (done = true));
     } else {
+      // For ethereum exports, we can't listen for completion...
+      // just assume completion if it's sent.
+      if (/eth$/.test(ethTx.assetAmount.symbol.toLowerCase())) {
+        await new Promise((r) => setTimeout(r, 15_000));
+        return true;
+      }
+
       const contract = new web3.eth.Contract(
         erc20TokenAbi,
         ethTx.toChain.findAssetWithLikeSymbolOrThrow(
@@ -330,17 +347,25 @@ export class EthBridge extends BaseBridge<
         onUpdateTx?.({ startingHeight });
       }
 
-      return new Promise<boolean>((resolve, reject) => {
+      const transferOptions = {
+        fromBlock: startingHeight,
+        filter: {
+          _to: ethTx.toAddress,
+          _value: ethTx.assetAmount.amount.toString(),
+        },
+      };
+
+      const pastEvents = await contract.getPastEvents("Transfer", {
+        ...transferOptions,
+        toBlock: "latest",
+      });
+      if (pastEvents.length) return true;
+
+      return new Promise<boolean>(async (resolve, reject) => {
         // wait for the money on this token to hit
         contract.events.Transfer(
-          {
-            filter: {
-              _to: ethTx.toAddress,
-              _value: ethTx.assetAmount.amount.toString(),
-            },
-            fromBlock: startingHeight,
-          },
-          (error: Error) => {
+          transferOptions,
+          (error: Error, value: any) => {
             if (error) reject(error);
             else resolve(true);
           },
@@ -614,6 +639,7 @@ export class EthBridge extends BaseBridge<
           handleError(err);
         });
     } catch (err) {
+      console.error(err);
       handleError(err);
     }
 

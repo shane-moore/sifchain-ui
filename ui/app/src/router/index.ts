@@ -21,6 +21,7 @@ import Pool_RemoveLiquidity from "@/views/PoolPage/children/RemoveLiquidity/Remo
 import { SwapPageState } from "@/views/SwapPage/useSwapPageData";
 import { ConfirmSwap } from "@/views/SwapPage/children/ConfirmSwap";
 import { ApproveSwap } from "@/views/SwapPage/children/Approve";
+import LeaderboardPage from "@/views/LeaderboardPage/LeaderboardPage";
 import ImportSelect from "@/views/BalancePage/Import/Select";
 import ImportConfirm from "@/views/BalancePage/Import/Confirm";
 import ImportProcessing from "@/views/BalancePage/Import/Processing";
@@ -30,6 +31,7 @@ import ExportProcessing from "@/views/BalancePage/Export/Processing";
 import { DeepReadonly } from "vue";
 import GetRowanModal from "@/views/BalancePage/GetRowan/GetRowanModal";
 import OnboardingModal from "@/components/OnboardingModal";
+import KeplrModal from "@/components/KeplrModal/KeplrModal";
 
 type SwapPageMeta = {
   title: string;
@@ -155,6 +157,11 @@ const routes: DeepReadonly<RouteRecordRaw[]> = [
         component: GetRowanModal,
       },
       {
+        name: "KeplrInfo",
+        path: "keplr",
+        component: KeplrModal,
+      },
+      {
         name: "Import",
         path: "import/:displaySymbol/select",
         component: ImportSelect,
@@ -191,6 +198,12 @@ const routes: DeepReadonly<RouteRecordRaw[]> = [
       // },
     ],
   },
+  {
+    name: "Leaderboard",
+    path: "/leaderboard/:type",
+    component: LeaderboardPage,
+  },
+
   // {
   //   path: "/balances/import/:assetFrom/:assetTo",
   //   name: "ImportListingPage",
