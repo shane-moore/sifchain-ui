@@ -9,6 +9,7 @@ import {
   useSwapCalculator,
   ServiceContext,
   Asset,
+  toBaseUnits,
 } from "@sifchain/sdk";
 import { useWalletButton } from "@/componentsLegacy/WithWallet/useWalletButton";
 import { getMaxAmount } from "../utils/getMaxAmount";
@@ -22,6 +23,11 @@ import { useChains, useNativeChain } from "@/hooks/useChains";
 import { formatAssetAmount } from "@/componentsLegacy/shared/utils";
 import { NativeDexClient } from "@sifchain/sdk/src/services/utils/SifClient/NativeDexClient";
 export type SwapPageState = "idle" | "confirm" | "submit" | "fail" | "success";
+
+export const SWAP_MIN_BALANCE = toBaseUnits(
+  "0.25",
+  useNativeChain().nativeAsset,
+);
 
 let defaultSymbol = "";
 const options = ["uatom", "uphoton", "uiris", "ceth"];
@@ -273,25 +279,39 @@ export const useSwapPageData = () => {
     toSymbol.value = fromSymbolValue;
   }
 
+  const nextStepMessage = computed(() => {
+    if (!accountStore.state.sifchain.address) {
+      return "Connect Sifchain Wallet";
+    }
+    if (fromAsset.value?.symbol.toLowerCase() === "rowan") {
+      const nativeBalance = accountStore.state.sifchain.balances.find(
+        (b) => b.asset.symbol.toLowerCase() === "rowan",
+      );
+      if (
+        nativeBalance?.amount
+          .subtract(fromFieldAmount.value || "0")
+          .lessThan(SWAP_MIN_BALANCE)
+      ) {
+        return `Insufficient ${fromAsset.value.displaySymbol.toUpperCase()} Balance`;
+      }
+    }
+    switch (state.value) {
+      case SwapState.ZERO_AMOUNTS:
+        return "Please enter an amount";
+      case SwapState.INSUFFICIENT_FUNDS:
+        return `Insufficient ${fromAsset.value.displaySymbol.toUpperCase()} Balance`;
+      case SwapState.INSUFFICIENT_LIQUIDITY:
+        return "Insufficient Liquidity";
+      case SwapState.INVALID_AMOUNT:
+        return "Invalid Amount";
+      case SwapState.VALID_INPUT:
+        return "Swap";
+    }
+  });
+
   return {
     connected,
-    nextStepMessage: computed(() => {
-      if (!accountStore.state.sifchain.address) {
-        return "Connect Sifchain Wallet";
-      }
-      switch (state.value) {
-        case SwapState.ZERO_AMOUNTS:
-          return "Please enter an amount";
-        case SwapState.INSUFFICIENT_FUNDS:
-          return "Insufficient Funds";
-        case SwapState.INSUFFICIENT_LIQUIDITY:
-          return "Insufficient Liquidity";
-        case SwapState.INVALID_AMOUNT:
-          return "Invalid Amount";
-        case SwapState.VALID_INPUT:
-          return "Swap";
-      }
-    }),
+    nextStepMessage,
     handleFromSymbolClicked(next: () => void) {
       selectedField.value = "from";
       next();
@@ -358,7 +378,7 @@ export const useSwapPageData = () => {
       });
     },
     nextStepAllowed: computed(() => {
-      return state.value === SwapState.VALID_INPUT;
+      return nextStepMessage.value === "Swap";
     }),
     pageState,
     txStatus,
