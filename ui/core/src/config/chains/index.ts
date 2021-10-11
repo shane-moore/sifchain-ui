@@ -10,7 +10,7 @@ import regen from "./regen";
 import osmosis from "./osmosis";
 import terra from "./terra";
 import juno from "./juno";
-
+import ixo from "./ixo";
 import { NetworkEnv } from "../getEnv";
 import { Network } from "../../entities";
 
@@ -31,6 +31,7 @@ export const chainConfigByNetworkEnv = Object.fromEntries(
         [Network.REGEN]: regen[env],
         [Network.TERRA]: terra[env],
         [Network.JUNO]: juno[env],
+        [Network.IXO]: ixo[env],
       },
     ];
   }),

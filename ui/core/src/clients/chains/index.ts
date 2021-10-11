@@ -11,3 +11,4 @@ export * from "./OsmosisChain";
 export * from "./_BaseChain";
 export * from "./TerraChain";
 export * from "./JunoChain";
+export * from "./IxoChain";
