@@ -158,6 +158,8 @@ export function useInitialize() {
         accountStore.updateBalances(Network.SIFCHAIN);
         accountStore.pollBalances(Network.SIFCHAIN);
 
+        // For legacy code to work
+        services.sif.connect();
         usecases.interchain.txManager.loadSavedTransferList(storeState.address);
       }
 
